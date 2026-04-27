@@ -653,8 +653,8 @@ function nanaCreateSession() {
 
 // ═════════════════════════════════════════════════════════════════
 // ADELE JOINS SESSION
-// ═══════════════════════════════════════════════════════════════════
-async function adeleJoin() {
+// ═════════════════════════════════════════════════════════════════
+function adeleJoin() {
   const code = document.getElementById('join-code-input').value.trim().toUpperCase();
   if (code.length < 4) {
     document.getElementById('join-error').textContent = 'Please enter the 4-letter code.';
@@ -662,28 +662,32 @@ async function adeleJoin() {
   }
   document.getElementById('join-error').textContent = 'Connecting…';
 
-  const snap = await sessionRef(code).once('value');
-  if (!snap.exists()) {
-    document.getElementById('join-error').textContent = "Code not found. Check with Nana!";
-    return;
-  }
-
-  local.sessionId = code;
-  // Mark Adele as joined
-  await sessionRef(code).child('adeleJoined').set(true);
-  startAdeleGame();
+  // Use callback-style — no await, safe on iOS
+  sessionRef(code).once('value', snap => {
+    if (!snap.exists()) {
+      document.getElementById('join-error').textContent = "Code not found. Check with Nana!";
+      return;
+    }
+    local.sessionId = code;
+    // Mark joined, then start immediately — don't wait for the write to confirm
+    sessionRef(code).child('adeleJoined').set(true);
+    startAdeleGame(snap.val());
+  }, err => {
+    document.getElementById('join-error').textContent = "Connection error. Try again.";
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // START GAMES
 // ══════════════════════════════════════════════════════════════════
 function startNanaGame() {
-  detachAllListeners(); // detach the waiting listener
+  detachAllListeners();
   const ref = sessionRef(local.sessionId);
 
-  // Load initial state
-  ref.once('value').then(snap => {
+  // Re-fetch session data with callback style (no .then, safe on iOS)
+  ref.once('value', snap => {
     const d = snap.val();
+    if (!d) return;
     local.adeleCard      = d.adeleCard;
     local.adeleMarked    = d.adeleMarked;
     local.nanaCard       = d.nanaCard;
@@ -700,82 +704,84 @@ function startNanaGame() {
     showScreen('nana-game');
     setSyncDot('nana', true);
 
-    // Live listeners
-    attachListener(ref.child('adeleMarked'), 'value', snap => {
-      if (snap.val()) {
-        local.adeleMarked = snap.val();
-        // Refresh peek if open
+    attachListener(ref.child('adeleMarked'), 'value', s => {
+      if (s.val()) {
+        local.adeleMarked = s.val();
         if (document.getElementById('adele-peek-overlay').classList.contains('active'))
           renderPeekGrid();
-        // Re-check look-again
         if (local.lastCalledWord) checkLookAgain(local.lastCalledWord);
       }
     });
-    attachListener(ref.child('calledWords'), 'value', snap => {
-      local.calledWords = snap.val() || [];
+    attachListener(ref.child('calledWords'), 'value', s => {
+      local.calledWords = s.val() || [];
       renderCalledChips();
     });
-    attachListener(ref.child('lastCalledWord'), 'value', snap => {
-      local.lastCalledWord = snap.val();
+    attachListener(ref.child('lastCalledWord'), 'value', s => {
+      local.lastCalledWord = s.val();
       updateCurrentWordDisplay();
     });
-    attachListener(ref.child('remainingWords'), 'value', snap => {
-      local.remainingWords = snap.val() || [];
+    attachListener(ref.child('remainingWords'), 'value', s => {
+      local.remainingWords = s.val() || [];
     });
-    attachListener(ref.child('nanaMarked'), 'value', snap => {
-      if (snap.val()) local.nanaMarked = snap.val();
+    attachListener(ref.child('nanaMarked'), 'value', s => {
+      if (s.val()) local.nanaMarked = s.val();
     });
-    attachListener(ref.child('winner'), 'value', snap => {
-      if (snap.val() && !document.getElementById('win-overlay').classList.contains('active'))
-        showWin(snap.val());
+    attachListener(ref.child('winner'), 'value', s => {
+      if (s.val() && !document.getElementById('win-overlay').classList.contains('active'))
+        showWin(s.val());
     });
-    attachListener(db.ref('.info/connected'), 'value', snap => {
-      setSyncDot('nana', snap.val() === true);
+    attachListener(db.ref('.info/connected'), 'value', s => {
+      setSyncDot('nana', s.val() === true);
     });
   });
 }
 
-function startAdeleGame() {
+function startAdeleGame(initialData) {
   detachAllListeners();
   const ref = sessionRef(local.sessionId);
 
-  ref.once('value').then(snap => {
-    const d = snap.val();
-    local.adeleCard   = d.adeleCard;
-    local.adeleMarked = d.adeleMarked;
-    local.calledWords = d.calledWords || [];
+  // Use data passed in directly if available, else fetch
+  function setup(d) {
+    if (!d) return;
+    local.adeleCard      = d.adeleCard;
+    local.adeleMarked    = d.adeleMarked;
+    local.calledWords    = d.calledWords || [];
     local.lastCalledWord = d.lastCalledWord || null;
-    local.winner      = d.winner;
+    local.winner         = d.winner;
+    local.listIdx        = d.listIdx || 0;
 
     renderAdeleCard();
     renderCalledChips();
     showScreen('adele-game');
     setSyncDot('adele', true);
 
-    // Live listeners
-    attachListener(ref.child('calledWords'), 'value', snap => {
+    attachListener(ref.child('calledWords'), 'value', s => {
       const prev = local.calledWords.length;
-      local.calledWords = snap.val() || [];
+      local.calledWords = s.val() || [];
       renderCalledChips();
-      // Flash new word banner if a new word was drawn
-      if (local.calledWords.length > prev && local.calledWords.length > 0) {
+      if (local.calledWords.length > prev && local.calledWords.length > 0)
         showNewWordBanner(local.calledWords[0]);
-      }
     });
-    attachListener(ref.child('lastCalledWord'), 'value', snap => {
-      local.lastCalledWord = snap.val();
+    attachListener(ref.child('lastCalledWord'), 'value', s => {
+      local.lastCalledWord = s.val();
     });
-    attachListener(ref.child('adeleMarked'), 'value', snap => {
-      if (snap.val()) local.adeleMarked = snap.val();
+    attachListener(ref.child('adeleMarked'), 'value', s => {
+      if (s.val()) local.adeleMarked = s.val();
     });
-    attachListener(ref.child('winner'), 'value', snap => {
-      if (snap.val() && !document.getElementById('win-overlay').classList.contains('active'))
-        showWin(snap.val());
+    attachListener(ref.child('winner'), 'value', s => {
+      if (s.val() && !document.getElementById('win-overlay').classList.contains('active'))
+        showWin(s.val());
     });
-    attachListener(db.ref('.info/connected'), 'value', snap => {
-      setSyncDot('adele', snap.val() === true);
+    attachListener(db.ref('.info/connected'), 'value', s => {
+      setSyncDot('adele', s.val() === true);
     });
-  });
+  }
+
+  if (initialData) {
+    setup(initialData);
+  } else {
+    ref.once('value', snap => setup(snap.val()));
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -842,15 +848,13 @@ function renderPeekGrid() {
   checkBingoHighlight(local.adeleMarked, 'peek-grid');
 }
 
-async function toggleAdeleCell(r, c) {
+function toggleAdeleCell(r, c) {
   if (local.winner) return;
   local.adeleMarked[r][c] = !local.adeleMarked[r][c];
   renderAdeleCard();
-  // Push to Firebase
-  await sessionRef(local.sessionId).child('adeleMarked').set(local.adeleMarked);
-  if (checkBingo(local.adeleMarked, 'adele-grid')) {
-    await sessionRef(local.sessionId).child('winner').set('Adele');
-  }
+  sessionRef(local.sessionId).child('adeleMarked').set(local.adeleMarked);
+  if (checkBingo(local.adeleMarked, 'adele-grid'))
+    sessionRef(local.sessionId).child('winner').set('Adele');
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -878,14 +882,13 @@ function renderNanaCard() {
   }
 }
 
-async function toggleNanaCell(r, c) {
+function toggleNanaCell(r, c) {
   if (local.winner) return;
   local.nanaMarked[r][c] = !local.nanaMarked[r][c];
   renderNanaCard();
-  await sessionRef(local.sessionId).child('nanaMarked').set(local.nanaMarked);
-  if (checkBingo(local.nanaMarked, 'nana-grid')) {
-    await sessionRef(local.sessionId).child('winner').set('Nana');
-  }
+  sessionRef(local.sessionId).child('nanaMarked').set(local.nanaMarked);
+  if (checkBingo(local.nanaMarked, 'nana-grid'))
+    sessionRef(local.sessionId).child('winner').set('Nana');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -933,10 +936,9 @@ function showWin(name) {
 // ══════════════════════════════════════════════════════════════════
 // DRAW WORD (Nana only)
 // ══════════════════════════════════════════════════════════════════
-async function drawWord() {
+function drawWord() {
   if (local.winner) return;
 
-  // Check look-again before drawing
   if (local.lastCalledWord) {
     const blocked = checkLookAgain(local.lastCalledWord);
     if (blocked) return;
@@ -952,15 +954,14 @@ async function drawWord() {
   const word = remaining.pop();
   const called = [word, ...local.calledWords];
 
-  // Optimistic local update
+  // Update local state immediately, push to Firebase in background
   local.remainingWords = remaining;
   local.calledWords = called;
   local.lastCalledWord = word;
   updateCurrentWordDisplay();
   renderCalledChips();
 
-  // Push to Firebase
-  await sessionRef(local.sessionId).update({
+  sessionRef(local.sessionId).update({
     remainingWords: remaining,
     calledWords:    called,
     lastCalledWord: word,
@@ -1030,7 +1031,7 @@ function renderCalledChips() {
 // ══════════════════════════════════════════════════════════════════
 // NANA NEW GAME
 // ══════════════════════════════════════════════════════════════════
-async function nanaNewGame() {
+function nanaNewGame() {
   document.getElementById('win-overlay').classList.remove('active');
   local.winner = null;
 
@@ -1038,17 +1039,7 @@ async function nanaNewGame() {
   const nanaCard  = generateCard(local.listIdx);
   const remaining = shuffle([...WORD_LISTS[local.listIdx].words]);
 
-  await sessionRef(local.sessionId).update({
-    adeleCard:      adeleCard,
-    adeleMarked:    makeMarkedGrid(),
-    nanaCard:       nanaCard,
-    nanaMarked:     makeMarkedGrid(),
-    calledWords:    [],
-    remainingWords: remaining,
-    lastCalledWord: null,
-    winner:         null,
-  });
-
+  // Update local state immediately, push to Firebase in background
   local.adeleCard      = adeleCard;
   local.adeleMarked    = makeMarkedGrid();
   local.nanaCard       = nanaCard;
@@ -1063,6 +1054,17 @@ async function nanaNewGame() {
   hideLookAgain();
   document.getElementById('current-word').textContent = '—';
   document.getElementById('word-count').textContent = '0 words called';
+
+  sessionRef(local.sessionId).update({
+    adeleCard:      adeleCard,
+    adeleMarked:    makeMarkedGrid(),
+    nanaCard:       nanaCard,
+    nanaMarked:     makeMarkedGrid(),
+    calledWords:    [],
+    remainingWords: remaining,
+    lastCalledWord: null,
+    winner:         null,
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════
