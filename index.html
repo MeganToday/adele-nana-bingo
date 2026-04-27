@@ -625,9 +625,7 @@ function nanaCreateSession() {
   document.getElementById('nana-session-code').textContent = code;
   showScreen('nana-waiting');
 
-  const adeleCard = generateCard(local.listIdx, local.gridSize);
-  const nanaCard  = generateCard(local.listIdx, local.gridSize);
-  const remaining = makeDrawPool(local.listIdx, adeleCard, nanaCard, local.gridSize, local.extraWords);
+  const { adeleCard, nanaCard, drawPool } = buildGameWords(local.listIdx, local.gridSize, local.extraWords);
 
   const sessionData = {
     listIdx:        local.listIdx,
@@ -638,7 +636,7 @@ function nanaCreateSession() {
     nanaCard:       nanaCard,
     nanaMarked:     makeMarkedGrid(local.gridSize),
     calledWords:    [],
-    remainingWords: remaining,
+    remainingWords: drawPool,
     lastCalledWord: null,
     winner:         null,
     adeleJoined:    false,
@@ -816,10 +814,12 @@ function showNewWordBanner(word) {
 // ═════════════════════════════════════════════════════════════════
 // CARD GENERATION
 // ═══════════════════════════════════════════════════════════════════
-function generateCard(listIdx, gridSize = 5) {
+// Build a card from a pre-supplied shuffled word array.
+// The caller is responsible for picking the right words so the pool matches.
+function generateCard(wordPool, gridSize = 5) {
   const cells = gridSize * gridSize;
-  const freeIdx = Math.floor(cells / 2); // center cell
-  const words = shuffle([...WORD_LISTS[listIdx].words]).slice(0, cells - 1);
+  const freeIdx = Math.floor(cells / 2);
+  const words = shuffle([...wordPool]).slice(0, cells - 1);
   const card = [];
   let wi = 0;
   for (let r = 0; r < gridSize; r++) {
@@ -830,6 +830,35 @@ function generateCard(listIdx, gridSize = 5) {
     }
   }
   return card;
+}
+
+// Build the shared draw pool, then return both cards and the pool together.
+// In exact mode: pick boardWords unique words, deal both cards from that set.
+// In extra mode: pick boardWords words for cards, then add extras up to 1.5x.
+function buildGameWords(listIdx, gridSize, extraWords) {
+  const boardWords = gridSize * gridSize - 1; // words per card excl FREE
+  const allWords = shuffle([...WORD_LISTS[listIdx].words]);
+
+  if (!extraWords) {
+    // Exact mode: same pool as both cards — pick just enough for two cards
+    // (cards will shuffle independently from this pool so they differ)
+    const pool = allWords.slice(0, boardWords);
+    const adeleCard = generateCard(pool, gridSize);
+    const nanaCard  = generateCard(pool, gridSize);
+    const drawPool  = shuffle([...pool]);
+    return { adeleCard, nanaCard, drawPool };
+  } else {
+    // Extra mode: cards each pick from the full list, pool = card words + extras
+    const adeleCard = generateCard(allWords, gridSize);
+    const nanaCard  = generateCard(shuffle([...WORD_LISTS[listIdx].words]), gridSize);
+    const cardWords = new Set();
+    [adeleCard, nanaCard].forEach(card =>
+      card.forEach(row => row.forEach(w => { if (w !== 'FREE') cardWords.add(w); })));
+    const extras = allWords.filter(w => !cardWords.has(w));
+    const target  = Math.round(boardWords * 1.5);
+    const drawPool = shuffle([...cardWords, ...extras.slice(0, Math.max(0, target - cardWords.size))]);
+    return { adeleCard, nanaCard, drawPool };
+  }
 }
 
 function makeMarkedGrid(gridSize = 5) {
@@ -1083,9 +1112,7 @@ function nanaNewGame() {
   document.getElementById('win-overlay').classList.remove('active');
   local.winner = null;
 
-  const adeleCard = generateCard(local.listIdx, local.gridSize);
-  const nanaCard  = generateCard(local.listIdx, local.gridSize);
-  const remaining = makeDrawPool(local.listIdx, adeleCard, nanaCard, local.gridSize, local.extraWords);
+  const { adeleCard, nanaCard, drawPool } = buildGameWords(local.listIdx, local.gridSize, local.extraWords);
 
   // Update local state immediately, push to Firebase in background
   local.adeleCard      = adeleCard;
@@ -1093,7 +1120,7 @@ function nanaNewGame() {
   local.nanaCard       = nanaCard;
   local.nanaMarked     = makeMarkedGrid(local.gridSize);
   local.calledWords    = [];
-  local.remainingWords = remaining;
+  local.remainingWords = drawPool;
   local.lastCalledWord = null;
 
   renderNanaCard();
@@ -1109,7 +1136,7 @@ function nanaNewGame() {
     nanaCard:       nanaCard,
     nanaMarked:     makeMarkedGrid(local.gridSize),
     calledWords:     [],
-    remainingWords:  remaining,
+    remainingWords:  drawPool,
     lastCalledWord:  null,
     lastMarkedWord:  null,
     winner:          null,
@@ -1188,25 +1215,6 @@ function shuffle(arr) {
 
 // Build a draw pool.
 // exactMode (extraWords=false): pool = all unique words on both cards exactly.
-// extraMode (extraWords=true):  pool = card words + extras up to 1.5x board word count.
-function makeDrawPool(listIdx, adeleCard, nanaCard, gridSize, extraWords) {
-  gridSize = gridSize || 5;
-  const boardWords = gridSize * gridSize - 1; // words per card (excl FREE)
-  const cardWords = new Set();
-  [adeleCard, nanaCard].forEach(card => {
-    card.forEach(row => row.forEach(w => { if (w !== 'FREE') cardWords.add(w); }));
-  });
-  if (!extraWords) {
-    // Exact mode: only words that appear on at least one card
-    return shuffle([...cardWords]);
-  } else {
-    // Extra mode: card words + random extras, total = 1.5 × boardWords (per card)
-    const target = Math.round(boardWords * 1.5);
-    const extras = shuffle(WORD_LISTS[listIdx].words.filter(w => !cardWords.has(w)));
-    return shuffle([...cardWords, ...extras.slice(0, Math.max(0, target - cardWords.size))]);
-  }
-}
-
 renderSetup();
 showScreen('welcome');
 </script>
