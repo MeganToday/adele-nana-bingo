@@ -371,7 +371,6 @@ html, body {
       <div class="header-btns">
         <span class="sync-dot" id="adele-sync-dot" title="Connected"></span>
         <button class="btn btn-secondary btn-small" onclick="showCalledOverlay()">Words Called</button>
-        <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">🏠</button>
       </div>
     </div>
     <div class="card-area">
@@ -389,7 +388,6 @@ html, body {
         <button class="btn btn-secondary btn-small" onclick="showCalledOverlay()">Words Called</button>
         <button class="btn btn-secondary btn-small" onclick="showAdelePeek()">👧 Adele's Card</button>
         <button class="btn btn-secondary btn-small" onclick="nanaNewGame()">🔄 New</button>
-        <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">🏠</button>
       </div>
     </div>
     <div class="nana-body">
@@ -442,10 +440,7 @@ html, body {
   <div id="win-overlay">
     <div class="win-title">🎉 BINGO! 🎉</div>
     <div class="win-sub" id="win-sub">Adele wins this round!</div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center">
-      <button class="btn btn-primary" id="win-play-again-btn">Play Again! 🎴</button>
-      <button class="btn btn-secondary" onclick="showScreen('welcome')">🏠 Home</button>
-    </div>
+    <button class="btn btn-primary" id="win-play-again-btn" onclick="showScreen('welcome')">Play Again! 🎴</button>
   </div>
 
   <canvas id="confetti-canvas"></canvas>
@@ -979,9 +974,6 @@ function showWin(name) {
   local.winner = name;
   launchConfetti();
   document.getElementById('win-sub').textContent = `${name} wins this round! 🎊`;
-  // Only Nana can start a new game
-  const btn = document.getElementById('win-play-again-btn');
-  btn.style.display = local.player === 'nana' ? 'inline-block' : 'none';
   setTimeout(() => document.getElementById('win-overlay').classList.add('active'), 600);
 }
 
@@ -1215,7 +1207,6 @@ function makeDrawPool(listIdx, adeleCard, nanaCard, gridSize, extraWords) {
   }
 }
 
-document.getElementById('win-play-again-btn').addEventListener('click', nanaNewGame);
 renderSetup();
 showScreen('welcome');
 </script>
