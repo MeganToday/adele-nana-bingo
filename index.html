@@ -479,27 +479,49 @@ const db = firebase.database();
 // ═══════════════════════════════════════════════════════════════════
 const WORD_LISTS = [
   {
-    name: 'List 1 — Easiest',
-    words: ['a','and','away','big','blue','can','come','down','find','for',
-            'funny','go','help','here','I','in','is','it','jump','little',
-            'look','make','me','my','not','one','play','red','run','said',
-            'see','the','three','two','up','we','where','yellow','you']
+    name: 'Kindergarten 1',
+    words: [
+      'a','and','away','big','blue','can','come','down','find','for',
+      'funny','go','help','here','I','in','is','it','jump','little',
+      'look','make','me','my','not','one','play','red','run','said',
+      'see','the','three','two','up','we','where','yellow','you','all',
+      'am','are','at','be','but','do','eat','four','get','good',
+      'have','he','into','like','new','no','now','on','our','out',
+      'please','ran','ride','saw','say','she','so','soon','that','they',
+      'this','too','want','was','went','what','who','will','with','yes',
+      'ball','bed','boy','car','cat','day','dog','fun','get','got',
+      'had','him','his','hot','how','let','man','may','mom','name',
+    ]
   },
   {
-    name: 'List 2 — Kindergarten',
-    words: ['all','am','are','at','ate','be','black','brown','but','came',
-            'did','do','eat','four','get','good','have','he','into','like',
-            'must','new','no','now','on','our','out','please','pretty','ran',
-            'ride','saw','say','she','so','soon','that','there','they','this',
-            'too','under','want','was','well','went','what','white','who','will',
-            'with','yes']
+    name: 'Kindergarten 2',
+    words: [
+      'after','again','an','any','ask','by','could','every','fly','from',
+      'give','going','had','has','her','him','his','how','just','know',
+      'let','live','may','of','old','once','open','over','put','round',
+      'some','stop','take','thank','them','then','think','walk','were','when',
+      'always','around','because','been','before','best','both','buy','call','cold',
+      'does','done','don\'t','fast','first','five','found','gave','goes','green',
+      'its','made','many','more','much','must','never','off','only','own',
+      'pull','read','right','sing','sit','sleep','tell','their','these','those',
+      'upon','use','very','wash','which','why','wish','work','would','write',
+      'black','brown','bring','clean','cut','drew','fall','full','hold','hurt',
+    ]
   },
   {
-    name: 'List 3 — Challenge',
-    words: ['after','again','an','any','ask','by','could','every','fly','from',
-            'give','going','had','has','her','him','his','how','just','know',
-            'let','live','may','of','old','once','open','over','put','round',
-            'some','stop','take','thank','them','then','think','walk','were','when']
+    name: 'First Grade',
+    words: [
+      'about','better','bring','carry','clean','cut','done','draw','drink','eight',
+      'fall','far','full','got','grow','hold','hot','hurt','if','keep',
+      'kind','laugh','light','long','myself','never','only','own','pick','seven',
+      'shall','show','six','small','start','ten','together','try','warm','write',
+      'able','across','against','almost','also','another','became','become','begin','being',
+      'below','between','body','book','built','certain','change','children','close','country',
+      'different','each','earth','enough','example','eye','face','family','father','felt',
+      'few','food','form','girl','got','group','grow','hand','hard','head',
+      'hear','high','home','idea','important','indian','it\'s','land','large','last',
+      'late','learn','leave','left','life','line','list','love','miss','mountain',
+    ]
   },
 ];
 
@@ -589,9 +611,13 @@ function sessionRef(id) { return db.ref('sessions/' + id); }
 // ═════════════════════════════════════════════════════════════════
 // NANA CREATES SESSION
 // ══════════════════════════════════════════════════════════════════
-async function nanaCreateSession() {
+function nanaCreateSession() {
   const code = makeCode();
   local.sessionId = code;
+
+  // Show waiting screen immediately (synchronous) so iOS doesn't block the tap
+  document.getElementById('nana-session-code').textContent = code;
+  showScreen('nana-waiting');
 
   const adeleCard = generateCard(local.listIdx);
   const nanaCard  = generateCard(local.listIdx);
@@ -610,17 +636,18 @@ async function nanaCreateSession() {
     adeleJoined:    false,
   };
 
-  await sessionRef(code).set(sessionData);
-
-  document.getElementById('nana-session-code').textContent = code;
-  showScreen('nana-waiting');
-
-  // Wait for Adele to join
-  const joinedRef = sessionRef(code).child('adeleJoined');
-  attachListener(joinedRef, 'value', snap => {
-    if (snap.val() === true) {
-      startNanaGame();
-    }
+  // Write to Firebase in background — no await blocking the UI
+  sessionRef(code).set(sessionData).then(() => {
+    // Wait for Adele to join
+    const joinedRef = sessionRef(code).child('adeleJoined');
+    attachListener(joinedRef, 'value', snap => {
+      if (snap.val() === true) {
+        startNanaGame();
+      }
+    });
+  }).catch(err => {
+    document.getElementById('nana-session-code').textContent = 'ERROR';
+    console.error('Firebase write failed:', err);
   });
 }
 
@@ -761,7 +788,6 @@ function showNewWordBanner(word) {
   el.classList.add('visible');
   clearTimeout(bannerTimer);
   bannerTimer = setTimeout(() => el.classList.remove('visible'), 3000);
-  speakWord(word);
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -896,7 +922,6 @@ function winLine(gridId, row, col, diag) {
 // ═══════════════════════════════════════════════════════════════════
 function showWin(name) {
   local.winner = name;
-  playSound('bell');
   launchConfetti();
   document.getElementById('win-sub').textContent = `${name} wins this round! 🎊`;
   // Only Nana can start a new game
@@ -933,8 +958,6 @@ async function drawWord() {
   local.lastCalledWord = word;
   updateCurrentWordDisplay();
   renderCalledChips();
-  playSound('ding');
-  speakWord(word);
 
   // Push to Firebase
   await sessionRef(local.sessionId).update({
@@ -1069,51 +1092,9 @@ function setSyncDot(player, online) {
   dot.title = online ? 'Connected' : 'Offline';
 }
 
-// ═════════════════════════════════════════════════════════════════
-// SPEECH
-// ══════════════════════════════════════════════════════════════════
-function speakWord(word) {
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const say = () => {
-    const utt = new SpeechSynthesisUtterance(word);
-    utt.rate = 0.85; utt.pitch = 1.1;
-    const voices = window.speechSynthesis.getVoices();
-    const v = voices.find(v => v.lang.startsWith('en') && /samantha|karen|victoria|moira|tessa|fiona/i.test(v.name))
-           || voices.find(v => v.lang.startsWith('en'));
-    if (v) utt.voice = v;
-    window.speechSynthesis.speak(utt);
-  };
-  say();
-  setTimeout(say, 1300);
-}
-
-// ═════════════════════════════════════════════════════════════════
-// SOUND
-// ══════════════════════════════════════════════════════════════════
-let audioCtx = null;
-function getAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  return audioCtx;
-}
-function playTone(ctx, freq, dur, type='sine', attack=0.01) {
-  const osc = ctx.createOscillator(), gain = ctx.createGain();
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.type = type; osc.frequency.value = freq;
-  gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + attack);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-  osc.start(ctx.currentTime); osc.stop(ctx.currentTime + dur + 0.05);
-}
-function playSound(type) {
-  try {
-    const ctx = getAudio();
-    if (type === 'ding') playTone(ctx, 523.25, 0.25);
-    else if (type === 'bell')
-      [523.25,1046.5,1568,2093].forEach((f,i) =>
-        setTimeout(()=>playTone(ctx,f,0.8-i*0.12,'sine',0.02+i*0.01),i*40));
-  } catch(e) {}
-}
+// Audio removed — no sound in this game
+function speakWord() {}
+function playSound() {}
 
 // ══════════════════════════════════════════════════════════════════
 // CONFETTI
@@ -1155,7 +1136,6 @@ function shuffle(arr) {
 }
 
 document.getElementById('win-play-again-btn').addEventListener('click', nanaNewGame);
-document.addEventListener('click', ()=>{ if(window.speechSynthesis) window.speechSynthesis.getVoices(); }, {once:true});
 renderSetup();
 showScreen('welcome');
 </script>
