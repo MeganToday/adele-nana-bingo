@@ -332,8 +332,9 @@ html, body {
       <div class="session-code" id="nana-session-code">···</div>
       <div class="session-code-label">Tell Adele this code</div>
     </div>
-    <div class="connecting-sub">Waiting for Adele to join…</div>
+    <div class="connecting-sub" id="nana-waiting-status">Waiting for Adele to join…</div>
     <div class="spinner" id="nana-spinner"></div>
+    <div id="nana-debug" style="color:rgba(255,255,255,0.5);font-size:13px;max-width:320px;text-align:center;word-break:break-all"></div>
     <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">← Back</button>
   </div>
 
@@ -636,18 +637,30 @@ function nanaCreateSession() {
     adeleJoined:    false,
   };
 
-  // Write to Firebase in background — no await blocking the UI
-  sessionRef(code).set(sessionData).then(() => {
-    // Wait for Adele to join
-    const joinedRef = sessionRef(code).child('adeleJoined');
-    attachListener(joinedRef, 'value', snap => {
-      if (snap.val() === true) {
-        startNanaGame();
-      }
-    });
-  }).catch(err => {
-    document.getElementById('nana-session-code').textContent = 'ERROR';
-    console.error('Firebase write failed:', err);
+  function dbg(msg) {
+    const el = document.getElementById('nana-debug');
+    if (el) el.textContent = msg;
+  }
+
+  // Monitor Firebase connection
+  db.ref('.info/connected').on('value', snap => {
+    dbg(snap.val() ? '✅ Firebase connected' : '⏳ Connecting to Firebase…');
+  });
+
+  // Set up the adeleJoined listener BEFORE the write, so we never miss it
+  const joinedRef = sessionRef(code).child('adeleJoined');
+  joinedRef.on('value', snap => {
+    dbg('adeleJoined = ' + snap.val());
+    if (snap.val() === true) {
+      joinedRef.off();
+      startNanaGame();
+    }
+  });
+
+  // Fire-and-forget write
+  sessionRef(code).set(sessionData, err => {
+    if (err) dbg('❌ Write error: ' + err.message);
+    else dbg('✅ Session written. Code: ' + code);
   });
 }
 
@@ -662,18 +675,24 @@ function adeleJoin() {
   }
   document.getElementById('join-error').textContent = 'Connecting…';
 
-  // Use callback-style — no await, safe on iOS
+  function setErr(msg) { document.getElementById('join-error').textContent = msg; }
+
+  // Test Firebase connection first
+  db.ref('.info/connected').once('value', connSnap => {
+    setErr(connSnap.val() ? '✅ Connected — looking up code…' : '⏳ Waiting for Firebase…');
+  });
+
   sessionRef(code).once('value', snap => {
     if (!snap.exists()) {
-      document.getElementById('join-error').textContent = "Code not found. Check with Nana!";
+      setErr('Code not found. Check with Nana!');
       return;
     }
+    setErr('✅ Found! Loading game…');
     local.sessionId = code;
-    // Mark joined, then start immediately — don't wait for the write to confirm
     sessionRef(code).child('adeleJoined').set(true);
     startAdeleGame(snap.val());
   }, err => {
-    document.getElementById('join-error').textContent = "Connection error. Try again.";
+    setErr('❌ Error: ' + err.message);
   });
 }
 
