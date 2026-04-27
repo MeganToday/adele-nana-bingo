@@ -321,6 +321,19 @@ html, body {
     <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Choose a word list:</div>
     <div class="list-tabs" id="list-tabs"></div>
     <div class="list-preview" id="list-preview"></div>
+
+    <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Board size:</div>
+    <div style="display:flex;gap:12px">
+      <button id="btn-grid-3" class="list-tab" onclick="setGridSize(3)">3 × 3</button>
+      <button id="btn-grid-5" class="list-tab active" onclick="setGridSize(5)">5 × 5</button>
+    </div>
+
+    <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Word pool:</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <button id="btn-pool-exact" class="list-tab active" onclick="setPoolMode(false)" style="white-space:normal;text-align:center;line-height:1.3">Every word<br>is on the board</button>
+      <button id="btn-pool-extra" class="list-tab" onclick="setPoolMode(true)" style="white-space:normal;text-align:center;line-height:1.3">Extra words<br>will be called</button>
+    </div>
+
     <button class="btn btn-primary" onclick="nanaCreateSession()">Create Game! 🎴</button>
     <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">← Back</button>
   </div>
@@ -362,13 +375,7 @@ html, body {
       </div>
     </div>
     <div class="card-area">
-      <div class="bingo-header-row">
-        <div class="bingo-header-cell">B</div>
-        <div class="bingo-header-cell">I</div>
-        <div class="bingo-header-cell">N</div>
-        <div class="bingo-header-cell">G</div>
-        <div class="bingo-header-cell">O</div>
-      </div>
+      <div class="bingo-header-row" id="adele-bingo-header"></div>
       <div class="bingo-grid" id="adele-grid"></div>
     </div>
   </div>
@@ -403,13 +410,7 @@ html, body {
       <div class="called-chips-row" id="nana-called-chips"></div>
       <div class="nana-card-label">Your card — tap to mark:</div>
       <div class="nana-card-wrap">
-        <div class="nana-bingo-header">
-          <div class="bingo-header-cell">B</div>
-          <div class="bingo-header-cell">I</div>
-          <div class="bingo-header-cell">N</div>
-          <div class="bingo-header-cell">G</div>
-          <div class="bingo-header-cell">O</div>
-        </div>
+        <div class="nana-bingo-header" id="nana-bingo-header"></div>
         <div class="nana-grid" id="nana-grid"></div>
       </div>
     </div>
@@ -430,13 +431,7 @@ html, body {
       <div class="overlay-title">👧 Adele's Card <span style="font-size:0.6em;opacity:0.6">live</span></div>
       <div class="peek-label">Updates in real time as Adele marks her card</div>
       <div style="margin-top:4px">
-        <div class="bingo-header-row" style="max-width:100%;margin-bottom:4px">
-          <div class="bingo-header-cell">B</div>
-          <div class="bingo-header-cell">I</div>
-          <div class="bingo-header-cell">N</div>
-          <div class="bingo-header-cell">G</div>
-          <div class="bingo-header-cell">O</div>
-        </div>
+        <div class="bingo-header-row" id="peek-bingo-header" style="max-width:100%;margin-bottom:4px"></div>
         <div class="bingo-grid" id="peek-grid"></div>
       </div>
       <button class="btn btn-secondary btn-small" onclick="hideOverlay('adele-peek-overlay')" style="align-self:center">Close</button>
@@ -534,6 +529,8 @@ let local = {
   player: null,       // 'adele' | 'nana'
   sessionId: null,
   listIdx: 0,
+  gridSize: 5,        // 3 or 5
+  extraWords: false,  // false = exact pool, true = 1.5x pool
   // Local copies of Firebase data (updated by listeners)
   adeleCard: [],
   adeleMarked: [],
@@ -600,6 +597,18 @@ function renderSetup() {
     WORD_LISTS[local.listIdx].words.join(', ');
 }
 
+function setGridSize(n) {
+  local.gridSize = n;
+  document.getElementById('btn-grid-3').classList.toggle('active', n === 3);
+  document.getElementById('btn-grid-5').classList.toggle('active', n === 5);
+}
+
+function setPoolMode(extra) {
+  local.extraWords = extra;
+  document.getElementById('btn-pool-exact').classList.toggle('active', !extra);
+  document.getElementById('btn-pool-extra').classList.toggle('active', extra);
+}
+
 // ══════════════════════════════════════════════════════════════════
 // SESSION CODE HELPERS
 // ═══════════════════════════════════════════════════════════════════
@@ -621,16 +630,18 @@ function nanaCreateSession() {
   document.getElementById('nana-session-code').textContent = code;
   showScreen('nana-waiting');
 
-  const adeleCard = generateCard(local.listIdx);
-  const nanaCard  = generateCard(local.listIdx);
-  const remaining = makeDrawPool(local.listIdx, adeleCard, nanaCard);
+  const adeleCard = generateCard(local.listIdx, local.gridSize);
+  const nanaCard  = generateCard(local.listIdx, local.gridSize);
+  const remaining = makeDrawPool(local.listIdx, adeleCard, nanaCard, local.gridSize, local.extraWords);
 
   const sessionData = {
     listIdx:        local.listIdx,
+    gridSize:       local.gridSize,
+    extraWords:     local.extraWords,
     adeleCard:      adeleCard,
-    adeleMarked:    makeMarkedGrid(),
+    adeleMarked:    makeMarkedGrid(local.gridSize),
     nanaCard:       nanaCard,
-    nanaMarked:     makeMarkedGrid(),
+    nanaMarked:     makeMarkedGrid(local.gridSize),
     calledWords:    [],
     remainingWords: remaining,
     lastCalledWord: null,
@@ -693,6 +704,8 @@ function startNanaGame() {
     local.remainingWords = d.remainingWords || [];
     local.lastCalledWord = d.lastCalledWord || null;
     local.winner         = d.winner;
+    local.gridSize       = d.gridSize   || 5;
+    local.extraWords     = d.extraWords || false;
 
     renderNanaCard();
     renderCalledChips();
@@ -758,7 +771,9 @@ function startAdeleGame(initialData) {
     local.calledWords    = d.calledWords || [];
     local.lastCalledWord = d.lastCalledWord || null;
     local.winner         = d.winner;
-    local.listIdx        = d.listIdx || 0;
+    local.listIdx        = d.listIdx    || 0;
+    local.gridSize       = d.gridSize   || 5;
+    local.extraWords     = d.extraWords || false;
 
     renderAdeleCard();
     renderCalledChips();
@@ -806,33 +821,52 @@ function showNewWordBanner(word) {
 // ═════════════════════════════════════════════════════════════════
 // CARD GENERATION
 // ═══════════════════════════════════════════════════════════════════
-function generateCard(listIdx) {
-  const words = shuffle([...WORD_LISTS[listIdx].words]).slice(0, 24);
+function generateCard(listIdx, gridSize = 5) {
+  const cells = gridSize * gridSize;
+  const freeIdx = Math.floor(cells / 2); // center cell
+  const words = shuffle([...WORD_LISTS[listIdx].words]).slice(0, cells - 1);
   const card = [];
   let wi = 0;
-  for (let r = 0; r < 5; r++) {
+  for (let r = 0; r < gridSize; r++) {
     card.push([]);
-    for (let c = 0; c < 5; c++) {
-      card[r].push(r === 2 && c === 2 ? 'FREE' : words[wi++]);
+    for (let c = 0; c < gridSize; c++) {
+      const idx = r * gridSize + c;
+      card[r].push(idx === freeIdx ? 'FREE' : words[wi++]);
     }
   }
   return card;
 }
 
-function makeMarkedGrid() {
-  return Array.from({length:5}, () => Array.from({length:5}, () => false));
+function makeMarkedGrid(gridSize = 5) {
+  return Array.from({length:gridSize}, () => Array.from({length:gridSize}, () => false));
 }
 
 // ══════════════════════════════════════════════════════════════════
 // RENDER ADELE'S CARD
 // ═════════════════════════════════════════════════════════════════
+const BINGO_LETTERS = ['B','I','N','G','O'];
+function renderBingoHeader(headerId, gs) {
+  const el = document.getElementById(headerId);
+  if (!el) return;
+  el.style.gridTemplateColumns = `repeat(${gs}, 1fr)`;
+  el.innerHTML = gs === 5
+    ? BINGO_LETTERS.map(l => `<div class="bingo-header-cell">${l}</div>`).join('')
+    : '';
+}
+
 function renderAdeleCard(gridId = 'adele-grid', readonly = false) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
+  const gs = local.gridSize || 5;
+  const freeIdx = Math.floor(gs * gs / 2);
+  // Update matching header if it exists
+  const headerMap = {'adele-grid':'adele-bingo-header','peek-grid':'peek-bingo-header'};
+  if (headerMap[gridId]) renderBingoHeader(headerMap[gridId], gs);
   grid.innerHTML = '';
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 5; c++) {
-      const isFree = r === 2 && c === 2;
+  grid.style.gridTemplateColumns = `repeat(${gs}, 1fr)`;
+  for (let r = 0; r < gs; r++) {
+    for (let c = 0; c < gs; c++) {
+      const isFree = r * gs + c === freeIdx;
       const cell = document.createElement('div');
       let cls = 'bingo-cell';
       if (local.adeleMarked[r]?.[c]) cls += ' marked-adele';
@@ -876,10 +910,14 @@ function toggleAdeleCell(r, c) {
 function renderNanaCard() {
   const grid = document.getElementById('nana-grid');
   if (!grid) return;
+  const gs = local.gridSize || 5;
+  const freeIdx = Math.floor(gs * gs / 2);
+  renderBingoHeader('nana-bingo-header', gs);
   grid.innerHTML = '';
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 5; c++) {
-      const isFree = r === 2 && c === 2;
+  grid.style.gridTemplateColumns = `repeat(${gs}, 1fr)`;
+  for (let r = 0; r < gs; r++) {
+    for (let c = 0; c < gs; c++) {
+      const isFree = r * gs + c === freeIdx;
       const cell = document.createElement('div');
       let cls = 'bingo-cell';
       if (local.nanaMarked[r]?.[c]) cls += ' marked-nana';
@@ -906,11 +944,13 @@ function toggleNanaCell(r, c) {
 // BINGO CHECK
 // ══════════════════════════════════════════════════════════════════
 function checkBingo(marked, gridId) {
+  const gs = local.gridSize || 5;
   const m = marked;
-  for (let r=0;r<5;r++) if(m[r].every(v=>v)) return winLine(gridId,r,null,null);
-  for (let c=0;c<5;c++) if(m.every(row=>row[c])) return winLine(gridId,null,c,null);
-  if([0,1,2,3,4].every(i=>m[i][i]))   return winLine(gridId,null,null,'tlbr');
-  if([0,1,2,3,4].every(i=>m[i][4-i])) return winLine(gridId,null,null,'trbl');
+  for (let r=0;r<gs;r++) if(m[r] && m[r].every(v=>v)) return winLine(gridId,r,null,null,gs);
+  for (let c=0;c<gs;c++) if(m.every(row=>row && row[c])) return winLine(gridId,null,c,null,gs);
+  const range = Array.from({length:gs},(_,i)=>i);
+  if(range.every(i=>m[i]?.[i]))      return winLine(gridId,null,null,'tlbr',gs);
+  if(range.every(i=>m[i]?.[gs-1-i])) return winLine(gridId,null,null,'trbl',gs);
   return false;
 }
 
@@ -918,15 +958,16 @@ function checkBingoHighlight(marked, gridId) {
   checkBingo(marked, gridId);
 }
 
-function winLine(gridId, row, col, diag) {
+function winLine(gridId, row, col, diag, gs) {
+  gs = gs || local.gridSize || 5;
   const grid = document.getElementById(gridId);
   if (!grid) return true;
   const cells = grid.querySelectorAll('.bingo-cell');
   const coords = [];
-  if (row !== null) for(let c=0;c<5;c++) coords.push(row*5+c);
-  if (col !== null) for(let r=0;r<5;r++) coords.push(r*5+col);
-  if (diag==='tlbr') for(let i=0;i<5;i++) coords.push(i*5+i);
-  if (diag==='trbl') for(let i=0;i<5;i++) coords.push(i*5+(4-i));
+  if (row !== null) for(let c=0;c<gs;c++) coords.push(row*gs+c);
+  if (col !== null) for(let r=0;r<gs;r++) coords.push(r*gs+col);
+  if (diag==='tlbr') for(let i=0;i<gs;i++) coords.push(i*gs+i);
+  if (diag==='trbl') for(let i=0;i<gs;i++) coords.push(i*gs+(gs-1-i));
   coords.forEach(idx => cells[idx]?.classList.add('win-cell'));
   return true;
 }
@@ -1050,15 +1091,15 @@ function nanaNewGame() {
   document.getElementById('win-overlay').classList.remove('active');
   local.winner = null;
 
-  const adeleCard = generateCard(local.listIdx);
-  const nanaCard  = generateCard(local.listIdx);
-  const remaining = makeDrawPool(local.listIdx, adeleCard, nanaCard);
+  const adeleCard = generateCard(local.listIdx, local.gridSize);
+  const nanaCard  = generateCard(local.listIdx, local.gridSize);
+  const remaining = makeDrawPool(local.listIdx, adeleCard, nanaCard, local.gridSize, local.extraWords);
 
   // Update local state immediately, push to Firebase in background
   local.adeleCard      = adeleCard;
-  local.adeleMarked    = makeMarkedGrid();
+  local.adeleMarked    = makeMarkedGrid(local.gridSize);
   local.nanaCard       = nanaCard;
-  local.nanaMarked     = makeMarkedGrid();
+  local.nanaMarked     = makeMarkedGrid(local.gridSize);
   local.calledWords    = [];
   local.remainingWords = remaining;
   local.lastCalledWord = null;
@@ -1072,9 +1113,9 @@ function nanaNewGame() {
 
   sessionRef(local.sessionId).update({
     adeleCard:      adeleCard,
-    adeleMarked:    makeMarkedGrid(),
+    adeleMarked:    makeMarkedGrid(local.gridSize),
     nanaCard:       nanaCard,
-    nanaMarked:     makeMarkedGrid(),
+    nanaMarked:     makeMarkedGrid(local.gridSize),
     calledWords:     [],
     remainingWords:  remaining,
     lastCalledWord:  null,
@@ -1153,17 +1194,25 @@ function shuffle(arr) {
   return arr;
 }
 
-// Build a draw pool: all words on both cards (guaranteed hits) plus
-// extras from the full list, shuffled, capped at 40 total.
-function makeDrawPool(listIdx, adeleCard, nanaCard) {
+// Build a draw pool.
+// exactMode (extraWords=false): pool = all unique words on both cards exactly.
+// extraMode (extraWords=true):  pool = card words + extras up to 1.5x board word count.
+function makeDrawPool(listIdx, adeleCard, nanaCard, gridSize, extraWords) {
+  gridSize = gridSize || 5;
+  const boardWords = gridSize * gridSize - 1; // words per card (excl FREE)
   const cardWords = new Set();
   [adeleCard, nanaCard].forEach(card => {
     card.forEach(row => row.forEach(w => { if (w !== 'FREE') cardWords.add(w); }));
   });
-  // Fill up to 40 with random extras from the full list
-  const extras = shuffle(WORD_LISTS[listIdx].words.filter(w => !cardWords.has(w)));
-  const pool = shuffle([...cardWords, ...extras.slice(0, Math.max(0, 36 - cardWords.size))]);
-  return pool;
+  if (!extraWords) {
+    // Exact mode: only words that appear on at least one card
+    return shuffle([...cardWords]);
+  } else {
+    // Extra mode: card words + random extras, total = 1.5 × boardWords (per card)
+    const target = Math.round(boardWords * 1.5);
+    const extras = shuffle(WORD_LISTS[listIdx].words.filter(w => !cardWords.has(w)));
+    return shuffle([...cardWords, ...extras.slice(0, Math.max(0, target - cardWords.size))]);
+  }
 }
 
 document.getElementById('win-play-again-btn').addEventListener('click', nanaNewGame);
