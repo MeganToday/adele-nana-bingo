@@ -300,7 +300,7 @@ html, body {
 <body>
 <div id="app">
 
-  <!-- ══ WELCOME ══════════════════��═══════════════════════════════ -->
+  <!-- ══ WELCOME ═════════════════════════════════════════════════ -->
   <div id="screen-welcome" class="screen screen-centered" style="background:linear-gradient(135deg,#1a1a2e,#2d1b4e)">
     <div class="welcome-emoji">🎴</div>
     <div class="welcome-title">Adele & Nana's<br><span style="color:#f9ca24">Bingo!</span> 🎉</div>
@@ -325,7 +325,7 @@ html, body {
     <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">← Back</button>
   </div>
 
-  <!-- ══ NANA WAITING (shows session code) ══════════��═════════════ -->
+  <!-- ══ NANA WAITING (shows session code) ═══════════════════════ -->
   <div id="screen-nana-waiting" class="screen screen-centered" style="background:linear-gradient(135deg,#1a3a1a,#1a1a2e)">
     <div class="connecting-title">🌻 Game created!</div>
     <div class="session-code-box">
@@ -337,7 +337,7 @@ html, body {
     <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">← Back</button>
   </div>
 
-  <!-- ══ ADELE JOIN ═══════════════════���════════════════════════════ -->
+  <!-- ══ ADELE JOIN ═══════════════════════════════════════════════ -->
   <div id="screen-adele-join" class="screen screen-centered" style="background:linear-gradient(135deg,#2d1b4e,#1a1a2e)">
     <div class="connecting-title">🌸 Join Nana's game!</div>
     <div class="connecting-sub">Type the code Nana gives you:</div>
@@ -351,7 +351,7 @@ html, body {
     <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">← Back</button>
   </div>
 
-  <!-- ══ ADELE GAME ═════════════���═══════════════��══════════════════ -->
+  <!-- ══ ADELE GAME ══════════════════════════════════════════════ -->
   <div id="screen-adele-game" class="screen">
     <div class="game-header">
       <span class="player-tag">🌸 Adele</span>
@@ -374,7 +374,7 @@ html, body {
     </div>
   </div>
 
-  <!-- ══ NANA GAME ═════════════════════════���══════════════════════ -->
+  <!-- ══ NANA GAME ═══════════════════════════════════════════════ -->
   <div id="screen-nana-game" class="screen">
     <div class="game-header">
       <span class="player-tag">🌻 Nana — Caller</span>
@@ -413,7 +413,7 @@ html, body {
     </div>
   </div>
 
-  <!-- ══ CALLED WORDS OVERLAY ════════════��════════════════════════ -->
+  <!-- ══ CALLED WORDS OVERLAY ════════════════════════════════════ -->
   <div class="overlay" id="called-overlay">
     <div class="overlay-box">
       <div class="overlay-title">📋 Words Called</div>
@@ -422,7 +422,7 @@ html, body {
     </div>
   </div>
 
-  <!-- ══ ADELE PEEK (Nana only — live) ═══════════���════════════════ -->
+  <!-- ══ ADELE PEEK (Nana only — live) ═══════════════════════════ -->
   <div class="overlay" id="adele-peek-overlay">
     <div class="overlay-box">
       <div class="overlay-title">👧 Adele's Card <span style="font-size:0.6em;opacity:0.6">live</span></div>
@@ -441,7 +441,7 @@ html, body {
     </div>
   </div>
 
-  <!-- ══ WIN OVERLAY ═══════════════════��══════════════════════════ -->
+  <!-- ══ WIN OVERLAY ═════════════════════════════════════════════ -->
   <div id="win-overlay">
     <div class="win-title">🎉 BINGO! 🎉</div>
     <div class="win-sub" id="win-sub">Adele wins this round!</div>
@@ -459,9 +459,9 @@ html, body {
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
 <script>
-// ═══════════════════════════════════════════════���═══════════════════
+// ══════════════════════════════════════════════════════════════════
 // FIREBASE CONFIG
-// ═════════════════════════════════════════════��═════════════════════
+// ══════════════════════════════════════════════════════════════════
 const firebaseConfig = {
   apiKey:            "AIzaSyB9bPqP6LJ8oV1pnCTRPFN50TyWXdDbXR4",
   authDomain:        "adele-nana-bingo.firebaseapp.com",
@@ -474,7 +474,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ════════════════════════════════════════════════���══════════════════
+// ══════════════════════════════════════════════════════════════════
 // WORD LISTS
 // ═══════════════════════════════════════════════════════════════════
 const WORD_LISTS = [
@@ -503,9 +503,9 @@ const WORD_LISTS = [
   },
 ];
 
-// ═══════════════════════════════════════��═════════════════════════��═
+// ═════════════════════════════════════════════════════════════════
 // LOCAL STATE
-// ════════════════════════════════════════��══════════════════════════
+// ══════════════════════════════════════════════════════════════════
 let local = {
   player: null,       // 'adele' | 'nana'
   sessionId: null,
@@ -534,9 +534,9 @@ function detachAllListeners() {
   listeners = [];
 }
 
-// ══════════════��════════════════════════════════════��═══════════════
+// ═════════════════════════════════════════════════════════════════
 // SCREEN NAV
-// ══════════════════════════════════════���═════════════════════════��══
+// ═════════════════════════════════════════════════════════════════
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
@@ -544,7 +544,7 @@ function showScreen(name) {
 
 // ═══════════════════════════════════════════════════════════════════
 // WELCOME
-// ══════════════════════════════════════════════��════════════════════
+// ══════════════════════════════════════════════════════════════════
 function choosePlayer(player) {
   local.player = player;
   detachAllListeners();
@@ -559,7 +559,7 @@ function choosePlayer(player) {
   }
 }
 
-// ═══════════════════════════════════════════════════���═══════════════
+// ══════════════════════════════════════════════════════════════════
 // SETUP (Nana)
 // ═══════════════════════════════════════════════════════════════════
 function renderSetup() {
@@ -576,7 +576,7 @@ function renderSetup() {
     WORD_LISTS[local.listIdx].words.join(', ');
 }
 
-// ═══════════════════════════════════════════════════════════════��═══
+// ══════════════════════════════════════════════════════════════════
 // SESSION CODE HELPERS
 // ═══════════════════════════════════════════════════════════════════
 function makeCode() {
@@ -586,9 +586,9 @@ function makeCode() {
 
 function sessionRef(id) { return db.ref('sessions/' + id); }
 
-// ══════════════════════��═════════════════════════��══════════════════
+// ═════════════════════════════════════════════════════════════════
 // NANA CREATES SESSION
-// ═════════════════════════════════��═════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 async function nanaCreateSession() {
   const code = makeCode();
   local.sessionId = code;
@@ -624,7 +624,7 @@ async function nanaCreateSession() {
   });
 }
 
-// ══════════════════════════���══════════════════════════���═════════════
+// ═════════════════════════════════════════════════════════════════
 // ADELE JOINS SESSION
 // ═══════════════════════════════════════════════════════════════════
 async function adeleJoin() {
@@ -649,7 +649,7 @@ async function adeleJoin() {
 
 // ═══════════════════════════════════════════════════════════════════
 // START GAMES
-// ═══════════════════════════════════════��═══════════════════════════
+// ══════════════════════════════════════════════════════════════════
 function startNanaGame() {
   detachAllListeners(); // detach the waiting listener
   const ref = sessionRef(local.sessionId);
@@ -764,7 +764,7 @@ function showNewWordBanner(word) {
   speakWord(word);
 }
 
-// ══════════════════��═══════════════════════════���════════════════════
+// ═════════════════════════════════════════════════════════════════
 // CARD GENERATION
 // ═══════════════════════════════════════════════════════════════════
 function generateCard(listIdx) {
@@ -784,9 +784,9 @@ function makeMarkedGrid() {
   return Array.from({length:5}, (_,r) => Array.from({length:5}, (__,c) => r===2&&c===2));
 }
 
-// ═════════════════════════════════════════════════��═════════════════
+// ══════════════════════════════════════════════════════════════════
 // RENDER ADELE'S CARD
-// ═══════════════════════���═════════════════════════════��═════════════
+// ═════════════════════════════════════════════════════════════════
 function renderAdeleCard(gridId = 'adele-grid', readonly = false) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
@@ -827,9 +827,9 @@ async function toggleAdeleCell(r, c) {
   }
 }
 
-// ═══════════════════���══════════════════════════════════��════════════
+// ═════════════════════════════════════════════════════════════════
 // RENDER NANA'S CARD
-// ════════════════════════════════════════════════════════��══════════
+// ══════════════════════════════════════════════════════════════════
 function renderNanaCard() {
   const grid = document.getElementById('nana-grid');
   if (!grid) return;
@@ -862,9 +862,9 @@ async function toggleNanaCell(r, c) {
   }
 }
 
-// ═══════════════════════════════════════��═══════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // BINGO CHECK
-// ════════════════════════════════════════════��══════════════════════
+// ══════════════════════════════════════════════════════════════════
 function checkBingo(marked, gridId) {
   const m = marked;
   for (let r=0;r<5;r++) if(m[r].every(v=>v)) return winLine(gridId,r,null,null);
@@ -905,9 +905,9 @@ function showWin(name) {
   setTimeout(() => document.getElementById('win-overlay').classList.add('active'), 600);
 }
 
-// ══════════════════════════════��════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // DRAW WORD (Nana only)
-// ════════════════════════════════════════════════════════��══════════
+// ══════════════════════════════════════════════════════════════════
 async function drawWord() {
   if (local.winner) return;
 
@@ -987,7 +987,7 @@ function hideLookAgain() {
   document.getElementById('look-again-box').classList.remove('visible');
 }
 
-// ════════════════════════════════════════════════════════���══════════
+// ══════════════════════════════════════════════════════════════════
 // CALLED CHIPS
 // ═══════════════════════════════════════════════════════════════════
 function renderCalledChips() {
@@ -1004,9 +1004,9 @@ function renderCalledChips() {
   });
 }
 
-// ═════════════════════════════════���═════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // NANA NEW GAME
-// ═════════════════════════════════════════���═════════════════════════
+// ══════════════════════════════════════════════════════════════════
 async function nanaNewGame() {
   document.getElementById('win-overlay').classList.remove('active');
   local.winner = null;
@@ -1042,7 +1042,7 @@ async function nanaNewGame() {
   document.getElementById('word-count').textContent = '0 words called';
 }
 
-// ═════════════════════════════════════���═════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // ADELE CARD PEEK
 // ═══════════════════════════════════════════════════════════════════
 function showAdelePeek() {
@@ -1050,18 +1050,18 @@ function showAdelePeek() {
   document.getElementById('adele-peek-overlay').classList.add('active');
 }
 
-// ════════════════════���══════════════════════════════���═══════════════
+// ═════════════════════════════════════════════════════════════════
 // CALLED WORDS OVERLAY
-// ═══════════════════════════════════════════��═══════════════════��═══
+// ═════════════════════════════════════════════════════════════════
 function showCalledOverlay() {
   renderCalledChips();
   document.getElementById('called-overlay').classList.add('active');
 }
 function hideOverlay(id) { document.getElementById(id).classList.remove('active'); }
 
-// ═════════════════════════���═════════════════════════════���═══════════
+// ═════════════════════════════════════════════════════════════════
 // SYNC DOT
-// ════════════════════════════════════════════���══════════════════════
+// ══════════════════════════════════════════════════════════════════
 function setSyncDot(player, online) {
   const dot = document.getElementById(player + '-sync-dot');
   if (!dot) return;
@@ -1069,9 +1069,9 @@ function setSyncDot(player, online) {
   dot.title = online ? 'Connected' : 'Offline';
 }
 
-// ══════════════════════════════���═════════════════════════════════���══
+// ═════════════════════════════════════════════════════════════════
 // SPEECH
-// ═══════════════════════════════════════════��═══════════════════════
+// ══════════════════════════════════════════════════════════════════
 function speakWord(word) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
@@ -1088,9 +1088,9 @@ function speakWord(word) {
   setTimeout(say, 1300);
 }
 
-// ════════════════════════��══════════════════════════════════���═══════
+// ═════════════════════════════════════════════════════════════════
 // SOUND
-// ══════════════════════════════════════════���════════════════════════
+// ══════════════════════════════════════════════════════════════════
 let audioCtx = null;
 function getAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1115,9 +1115,9 @@ function playSound(type) {
   } catch(e) {}
 }
 
-// ═══════════════════════════════════════════���═══════════════════════
+// ══════════════════════════════════════════════════════════════════
 // CONFETTI
-// ═════════════════════════════════════���═════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 function launchConfetti() {
   const cv = document.getElementById('confetti-canvas');
   cv.width = window.innerWidth; cv.height = window.innerHeight;
@@ -1143,7 +1143,7 @@ function launchConfetti() {
   })();
 }
 
-// ═════════════════════��════════════════════════════════════���════════
+// ═════════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════
 function shuffle(arr) {
