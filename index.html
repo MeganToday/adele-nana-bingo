@@ -301,7 +301,7 @@ html, body {
 <div id="app">
 
   <!-- ══ WELCOME ═════════════════════════════════════════════════ -->
-  <div id="screen-welcome" class="screen screen-centered" style="background:linear-gradient(135deg,#1a1a2e,#2d1b4e)">
+  <div id="screen-welcome" class="screen screen-centered active" style="background:linear-gradient(135deg,#1a1a2e,#2d1b4e)">
     <div class="welcome-emoji">🎴</div>
     <div class="welcome-title">Adele & Nana's<br><span style="color:#f9ca24">Bingo!</span> 🎉</div>
     <div class="welcome-sub">A sight word game for two</div>
@@ -1157,6 +1157,7 @@ function shuffle(arr) {
 document.getElementById('win-play-again-btn').addEventListener('click', nanaNewGame);
 document.addEventListener('click', ()=>{ if(window.speechSynthesis) window.speechSynthesis.getVoices(); }, {once:true});
 renderSetup();
+showScreen('welcome');
 </script>
 </body>
 </html>
