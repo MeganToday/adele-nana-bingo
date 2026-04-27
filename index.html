@@ -361,7 +361,6 @@ html, body {
         <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">🏠</button>
       </div>
     </div>
-    <div class="new-word-banner" id="new-word-banner">— —</div>
     <div class="card-area">
       <div class="bingo-header-row">
         <div class="bingo-header-cell">B</div>
@@ -388,6 +387,7 @@ html, body {
     </div>
     <div class="nana-body">
       <div class="current-word-box">
+        <div class="current-word" id="current-word">—</div>
         <div class="word-count" id="word-count">0 words called</div>
       </div>
       <div class="look-again-box" id="look-again-box">
@@ -766,11 +766,8 @@ function startAdeleGame(initialData) {
     setSyncDot('adele', true);
 
     attachListener(ref.child('calledWords'), 'value', s => {
-      const prev = local.calledWords.length;
       local.calledWords = s.val() || [];
       renderCalledChips();
-      if (local.calledWords.length > prev && local.calledWords.length > 0)
-        showNewWordBanner(local.calledWords[0]);
     });
     attachListener(ref.child('lastCalledWord'), 'value', s => {
       local.lastCalledWord = s.val();
@@ -983,8 +980,20 @@ function drawWord() {
 }
 
 function updateCurrentWordDisplay() {
-  const el = document.getElementById('word-count');
-  if (el) el.textContent =
+  const wordEl = document.getElementById('current-word');
+  if (wordEl) {
+    const word = local.lastCalledWord;
+    if (word) {
+      wordEl.classList.remove('pop');
+      void wordEl.offsetWidth;
+      wordEl.classList.add('pop');
+      wordEl.textContent = word;
+    } else {
+      wordEl.textContent = '—';
+    }
+  }
+  const countEl = document.getElementById('word-count');
+  if (countEl) countEl.textContent =
     `${local.calledWords.length} word${local.calledWords.length===1?'':'s'} called`;
 }
 
