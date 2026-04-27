@@ -332,9 +332,8 @@ html, body {
       <div class="session-code" id="nana-session-code">···</div>
       <div class="session-code-label">Tell Adele this code</div>
     </div>
-    <div class="connecting-sub" id="nana-waiting-status">Waiting for Adele to join…</div>
-    <div class="spinner" id="nana-spinner"></div>
-    <div id="nana-debug" style="color:rgba(255,255,255,0.5);font-size:13px;max-width:320px;text-align:center;word-break:break-all"></div>
+    <div class="connecting-sub">Waiting for Adele to join…</div>
+    <div class="spinner"></div>
     <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">← Back</button>
   </div>
 
@@ -389,11 +388,13 @@ html, body {
     </div>
     <div class="nana-body">
       <div class="current-word-box">
-        <div class="current-word" id="current-word">—</div>
         <div class="word-count" id="word-count">0 words called</div>
       </div>
       <div class="look-again-box" id="look-again-box">
         👀 Look again, Adele! Find "<span id="look-again-word"></span>" on your card!
+      </div>
+      <div id="adele-found-toast" style="display:none;background:rgba(240,147,251,0.25);border:2px solid #f093fb;border-radius:16px;padding:10px 20px;color:#fff;font-size:clamp(14px,2.5vw,20px);font-weight:bold;text-align:center;width:100%;max-width:480px">
+        🌸 Adele found "<span id="adele-found-word"></span>"!
       </div>
       <div class="draw-btn-wrap">
         <button class="btn-draw" id="btn-draw" onclick="drawWord()">Draw a Word! 🎲</button>
@@ -637,31 +638,16 @@ function nanaCreateSession() {
     adeleJoined:    false,
   };
 
-  function dbg(msg) {
-    const el = document.getElementById('nana-debug');
-    if (el) el.textContent = msg;
-  }
-
-  // Monitor Firebase connection
-  db.ref('.info/connected').on('value', snap => {
-    dbg(snap.val() ? '✅ Firebase connected' : '⏳ Connecting to Firebase…');
-  });
-
-  // Set up the adeleJoined listener BEFORE the write, so we never miss it
+  // Set up the adeleJoined listener BEFORE the write so we never miss it
   const joinedRef = sessionRef(code).child('adeleJoined');
   joinedRef.on('value', snap => {
-    dbg('adeleJoined = ' + snap.val());
     if (snap.val() === true) {
       joinedRef.off();
       startNanaGame();
     }
   });
 
-  // Fire-and-forget write
-  sessionRef(code).set(sessionData, err => {
-    if (err) dbg('❌ Write error: ' + err.message);
-    else dbg('✅ Session written. Code: ' + code);
-  });
+  sessionRef(code).set(sessionData);
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -675,24 +661,16 @@ function adeleJoin() {
   }
   document.getElementById('join-error').textContent = 'Connecting…';
 
-  function setErr(msg) { document.getElementById('join-error').textContent = msg; }
-
-  // Test Firebase connection first
-  db.ref('.info/connected').once('value', connSnap => {
-    setErr(connSnap.val() ? '✅ Connected — looking up code…' : '⏳ Waiting for Firebase…');
-  });
-
   sessionRef(code).once('value', snap => {
     if (!snap.exists()) {
-      setErr('Code not found. Check with Nana!');
+      document.getElementById('join-error').textContent = 'Code not found. Check with Nana!';
       return;
     }
-    setErr('✅ Found! Loading game…');
     local.sessionId = code;
     sessionRef(code).child('adeleJoined').set(true);
     startAdeleGame(snap.val());
-  }, err => {
-    setErr('❌ Error: ' + err.message);
+  }, () => {
+    document.getElementById('join-error').textContent = 'Connection error. Try again.';
   });
 }
 
@@ -749,10 +727,23 @@ function startNanaGame() {
       if (s.val() && !document.getElementById('win-overlay').classList.contains('active'))
         showWin(s.val());
     });
+    attachListener(ref.child('lastMarkedWord'), 'value', s => {
+      const word = s.val();
+      if (word) showAdeleFoundToast(word);
+    });
     attachListener(db.ref('.info/connected'), 'value', s => {
       setSyncDot('nana', s.val() === true);
     });
   });
+}
+
+let adeleFoundTimer = null;
+function showAdeleFoundToast(word) {
+  document.getElementById('adele-found-word').textContent = word;
+  const el = document.getElementById('adele-found-toast');
+  el.style.display = 'block';
+  clearTimeout(adeleFoundTimer);
+  adeleFoundTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
 }
 
 function startAdeleGame(initialData) {
@@ -832,7 +823,7 @@ function generateCard(listIdx) {
 }
 
 function makeMarkedGrid() {
-  return Array.from({length:5}, (_,r) => Array.from({length:5}, (__,c) => r===2&&c===2));
+  return Array.from({length:5}, () => Array.from({length:5}, () => false));
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -847,12 +838,12 @@ function renderAdeleCard(gridId = 'adele-grid', readonly = false) {
       const isFree = r === 2 && c === 2;
       const cell = document.createElement('div');
       let cls = 'bingo-cell';
-      if (isFree)                      cls += ' free';
-      if (local.adeleMarked[r]?.[c])   cls += ' marked-adele';
-      if (readonly)                    cls += ' readonly';
+      if (local.adeleMarked[r]?.[c]) cls += ' marked-adele';
+      else if (isFree)               cls += ' free';
+      if (readonly)                  cls += ' readonly';
       cell.className = cls;
       cell.textContent = isFree ? '⭐ FREE' : (local.adeleCard[r]?.[c] || '');
-      if (!isFree && !readonly) {
+      if (!readonly) {
         const row = r, col = c;
         cell.addEventListener('click', () => toggleAdeleCell(row, col));
       }
@@ -869,9 +860,15 @@ function renderPeekGrid() {
 
 function toggleAdeleCell(r, c) {
   if (local.winner) return;
-  local.adeleMarked[r][c] = !local.adeleMarked[r][c];
+  const nowMarked = !local.adeleMarked[r][c];
+  local.adeleMarked[r][c] = nowMarked;
   renderAdeleCard();
   sessionRef(local.sessionId).child('adeleMarked').set(local.adeleMarked);
+  // Tell Nana which word Adele just found (only when marking, not unmarking)
+  if (nowMarked) {
+    const word = local.adeleCard[r]?.[c] || (r===2&&c===2 ? 'FREE' : '');
+    if (word) sessionRef(local.sessionId).child('lastMarkedWord').set(word);
+  }
   if (checkBingo(local.adeleMarked, 'adele-grid'))
     sessionRef(local.sessionId).child('winner').set('Adele');
 }
@@ -888,14 +885,12 @@ function renderNanaCard() {
       const isFree = r === 2 && c === 2;
       const cell = document.createElement('div');
       let cls = 'bingo-cell';
-      if (isFree)                     cls += ' free';
-      if (local.nanaMarked[r]?.[c])   cls += ' marked-nana';
+      if (local.nanaMarked[r]?.[c]) cls += ' marked-nana';
+      else if (isFree)              cls += ' free';
       cell.className = cls;
       cell.textContent = isFree ? '⭐ FREE' : (local.nanaCard[r]?.[c] || '');
-      if (!isFree) {
-        const row = r, col = c;
-        cell.addEventListener('click', () => toggleNanaCell(row, col));
-      }
+      const row = r, col = c;
+      cell.addEventListener('click', () => toggleNanaCell(row, col));
       grid.appendChild(cell);
     }
   }
@@ -988,16 +983,8 @@ function drawWord() {
 }
 
 function updateCurrentWordDisplay() {
-  const el = document.getElementById('current-word');
-  const word = local.lastCalledWord;
-  if (!el) return;
-  if (word) {
-    el.classList.remove('pop');
-    void el.offsetWidth;
-    el.classList.add('pop');
-    el.textContent = word;
-  }
-  document.getElementById('word-count').textContent =
+  const el = document.getElementById('word-count');
+  if (el) el.textContent =
     `${local.calledWords.length} word${local.calledWords.length===1?'':'s'} called`;
 }
 
@@ -1079,10 +1066,11 @@ function nanaNewGame() {
     adeleMarked:    makeMarkedGrid(),
     nanaCard:       nanaCard,
     nanaMarked:     makeMarkedGrid(),
-    calledWords:    [],
-    remainingWords: remaining,
-    lastCalledWord: null,
-    winner:         null,
+    calledWords:     [],
+    remainingWords:  remaining,
+    lastCalledWord:  null,
+    lastMarkedWord:  null,
+    winner:          null,
   });
 }
 
@@ -1165,7 +1153,7 @@ function makeDrawPool(listIdx, adeleCard, nanaCard) {
   });
   // Fill up to 40 with random extras from the full list
   const extras = shuffle(WORD_LISTS[listIdx].words.filter(w => !cardWords.has(w)));
-  const pool = shuffle([...cardWords, ...extras.slice(0, Math.max(0, 40 - cardWords.size))]);
+  const pool = shuffle([...cardWords, ...extras.slice(0, Math.max(0, 36 - cardWords.size))]);
   return pool;
 }
 
