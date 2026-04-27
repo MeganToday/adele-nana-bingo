@@ -622,7 +622,7 @@ function nanaCreateSession() {
 
   const adeleCard = generateCard(local.listIdx);
   const nanaCard  = generateCard(local.listIdx);
-  const remaining = shuffle([...WORD_LISTS[local.listIdx].words]);
+  const remaining = makeDrawPool(local.listIdx, adeleCard, nanaCard);
 
   const sessionData = {
     listIdx:        local.listIdx,
@@ -1056,7 +1056,7 @@ function nanaNewGame() {
 
   const adeleCard = generateCard(local.listIdx);
   const nanaCard  = generateCard(local.listIdx);
-  const remaining = shuffle([...WORD_LISTS[local.listIdx].words]);
+  const remaining = makeDrawPool(local.listIdx, adeleCard, nanaCard);
 
   // Update local state immediately, push to Firebase in background
   local.adeleCard      = adeleCard;
@@ -1154,6 +1154,19 @@ function shuffle(arr) {
     [arr[i],arr[j]]=[arr[j],arr[i]];
   }
   return arr;
+}
+
+// Build a draw pool: all words on both cards (guaranteed hits) plus
+// extras from the full list, shuffled, capped at 40 total.
+function makeDrawPool(listIdx, adeleCard, nanaCard) {
+  const cardWords = new Set();
+  [adeleCard, nanaCard].forEach(card => {
+    card.forEach(row => row.forEach(w => { if (w !== 'FREE') cardWords.add(w); }));
+  });
+  // Fill up to 40 with random extras from the full list
+  const extras = shuffle(WORD_LISTS[listIdx].words.filter(w => !cardWords.has(w)));
+  const pool = shuffle([...cardWords, ...extras.slice(0, Math.max(0, 40 - cardWords.size))]);
+  return pool;
 }
 
 document.getElementById('win-play-again-btn').addEventListener('click', nanaNewGame);
