@@ -189,6 +189,8 @@ html, body {
 .bingo-cell.free { background:rgba(255,255,255,0.22); border-color:rgba(255,255,255,0.45); cursor:default; }
 .bingo-cell.readonly { cursor:default; }
 .bingo-cell.readonly:active { transform:none; }
+.bingo-cell.not-called { cursor:default; opacity:0.5; }
+.bingo-cell.not-called:active { transform:none; }
 .bingo-cell.win-cell { animation:winPulse 0.7s ease infinite alternate; }
 @keyframes winPulse {
   from{box-shadow:0 0 8px #ffdd57;border-color:#ffdd57}
@@ -334,6 +336,12 @@ html, body {
       <button id="btn-pool-extra" class="list-tab" onclick="setPoolMode(true)" style="white-space:normal;text-align:center;line-height:1.3">Extra words<br>will be called</button>
     </div>
 
+    <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Game mode:</div>
+    <div style="display:flex;gap:12px">
+      <button id="btn-mode-regular" class="list-tab active" onclick="setGameMode('regular')">Regular</button>
+      <button id="btn-mode-blackout" class="list-tab" onclick="setGameMode('blackout')">Blackout</button>
+    </div>
+
     <button class="btn btn-primary" onclick="nanaCreateSession()">Create Game! 🎴</button>
     <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">← Back</button>
   </div>
@@ -373,6 +381,9 @@ html, body {
         <button class="btn btn-secondary btn-small" onclick="showCalledOverlay()">Words Called</button>
       </div>
     </div>
+    <div id="adele-bingo-toast" style="display:none;background:rgba(249,202,36,0.25);border:2px solid #f9ca24;border-radius:16px;padding:10px 20px;color:#fff;font-size:clamp(14px,2.5vw,20px);font-weight:bold;text-align:center;margin:8px auto;max-width:480px">
+      🎉 <span id="adele-bingo-who"></span> got a Bingo!
+    </div>
     <div class="card-area">
       <div class="bingo-header-row" id="adele-bingo-header"></div>
       <div class="bingo-grid" id="adele-grid"></div>
@@ -400,6 +411,9 @@ html, body {
       </div>
       <div id="adele-found-toast" style="display:none;background:rgba(240,147,251,0.25);border:2px solid #f093fb;border-radius:16px;padding:10px 20px;color:#fff;font-size:clamp(14px,2.5vw,20px);font-weight:bold;text-align:center;width:100%;max-width:480px">
         🌸 Adele found "<span id="adele-found-word"></span>"!
+      </div>
+      <div id="nana-bingo-toast" style="display:none;background:rgba(249,202,36,0.25);border:2px solid #f9ca24;border-radius:16px;padding:10px 20px;color:#fff;font-size:clamp(14px,2.5vw,20px);font-weight:bold;text-align:center;width:100%;max-width:480px">
+        🎉 <span id="nana-bingo-who"></span> got a Bingo!
       </div>
       <div class="draw-btn-wrap">
         <button class="btn-draw" id="btn-draw" onclick="drawWord()">Draw a Word! 🎲</button>
@@ -526,6 +540,7 @@ let local = {
   listIdx: 0,
   gridSize: 5,        // 3 or 5
   extraWords: false,  // false = exact pool, true = 1.5x pool
+  gameMode: 'regular', // 'regular' or 'blackout'
   // Local copies of Firebase data (updated by listeners)
   adeleCard: [],
   adeleMarked: [],
@@ -535,6 +550,8 @@ let local = {
   lastCalledWord: null,
   remainingWords: [],
   winner: null,
+  adeleBingo: false,   // blackout mode: has Adele completed a line yet?
+  nanaBingo: false,    // blackout mode: has Nana completed a line yet?
 };
 
 // Firebase listeners — kept so we can detach on new game
@@ -591,6 +608,18 @@ function renderSetup() {
   });
   document.getElementById('list-preview').textContent =
     WORD_LISTS[local.listIdx].words.join(', ');
+
+  document.getElementById('btn-grid-3').classList.toggle('active', local.gridSize === 3);
+  document.getElementById('btn-grid-5').classList.toggle('active', local.gridSize === 5);
+  document.getElementById('btn-pool-exact').classList.toggle('active', !local.extraWords);
+  document.getElementById('btn-pool-extra').classList.toggle('active', local.extraWords);
+  document.getElementById('btn-mode-regular').classList.toggle('active', local.gameMode === 'regular');
+  document.getElementById('btn-mode-blackout').classList.toggle('active', local.gameMode === 'blackout');
+  const extraBtn = document.getElementById('btn-pool-extra');
+  const lockExtra = local.gameMode === 'blackout';
+  extraBtn.disabled = lockExtra;
+  extraBtn.style.opacity = lockExtra ? '0.4' : '';
+  extraBtn.style.cursor = lockExtra ? 'not-allowed' : '';
 }
 
 function setGridSize(n) {
@@ -600,9 +629,16 @@ function setGridSize(n) {
 }
 
 function setPoolMode(extra) {
+  if (local.gameMode === 'blackout' && extra) return; // Blackout requires exact pool
   local.extraWords = extra;
   document.getElementById('btn-pool-exact').classList.toggle('active', !extra);
   document.getElementById('btn-pool-extra').classList.toggle('active', extra);
+}
+
+function setGameMode(mode) {
+  local.gameMode = mode;
+  if (mode === 'blackout') local.extraWords = false; // force exact pool so every card word gets called
+  renderSetup();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -632,6 +668,7 @@ function nanaCreateSession() {
     listIdx:        local.listIdx,
     gridSize:       local.gridSize,
     extraWords:     local.extraWords,
+    gameMode:       local.gameMode,
     adeleCard:      adeleCard,
     adeleMarked:    makeMarkedGrid(local.gridSize),
     nanaCard:       nanaCard,
@@ -641,6 +678,9 @@ function nanaCreateSession() {
     lastCalledWord: null,
     winner:         null,
     adeleJoined:    false,
+    adeleBingo:     false,
+    nanaBingo:      false,
+    lastBingoBy:    null,
   };
 
   // Set up the adeleJoined listener BEFORE the write so we never miss it
@@ -700,6 +740,9 @@ function startNanaGame() {
     local.winner         = d.winner;
     local.gridSize       = d.gridSize   || 5;
     local.extraWords     = d.extraWords || false;
+    local.gameMode       = d.gameMode   || 'regular';
+    local.adeleBingo     = d.adeleBingo || false;
+    local.nanaBingo      = d.nanaBingo  || false;
 
     renderNanaCard();
     renderCalledChips();
@@ -738,6 +781,10 @@ function startNanaGame() {
       const word = s.val();
       if (word) showAdeleFoundToast(word);
     });
+    attachListener(ref.child('lastBingoBy'), 'value', s => {
+      const who = s.val();
+      if (who) showBingoToast('nana', who);
+    });
     attachListener(db.ref('.info/connected'), 'value', s => {
       setSyncDot('nana', s.val() === true);
     });
@@ -751,6 +798,17 @@ function showAdeleFoundToast(word) {
   el.style.display = 'block';
   clearTimeout(adeleFoundTimer);
   adeleFoundTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+let bingoToastTimer = { adele: null, nana: null };
+function showBingoToast(forPlayer, who) {
+  const whoEl = document.getElementById(forPlayer + '-bingo-who');
+  const el = document.getElementById(forPlayer + '-bingo-toast');
+  if (!whoEl || !el) return;
+  whoEl.textContent = who;
+  el.style.display = 'block';
+  clearTimeout(bingoToastTimer[forPlayer]);
+  bingoToastTimer[forPlayer] = setTimeout(() => { el.style.display = 'none'; }, 3000);
 }
 
 function startAdeleGame(initialData) {
@@ -768,6 +826,9 @@ function startAdeleGame(initialData) {
     local.listIdx        = d.listIdx    || 0;
     local.gridSize       = d.gridSize   || 5;
     local.extraWords     = d.extraWords || false;
+    local.gameMode       = d.gameMode   || 'regular';
+    local.adeleBingo     = d.adeleBingo || false;
+    local.nanaBingo      = d.nanaBingo  || false;
 
     renderAdeleCard();
     renderCalledChips();
@@ -787,6 +848,10 @@ function startAdeleGame(initialData) {
     attachListener(ref.child('winner'), 'value', s => {
       if (s.val() && !document.getElementById('win-overlay').classList.contains('active'))
         showWin(s.val());
+    });
+    attachListener(ref.child('lastBingoBy'), 'value', s => {
+      const who = s.val();
+      if (who) showBingoToast('adele', who);
     });
     attachListener(db.ref('.info/connected'), 'value', s => {
       setSyncDot('adele', s.val() === true);
@@ -893,9 +958,12 @@ function renderAdeleCard(gridId = 'adele-grid', readonly = false) {
     for (let c = 0; c < gs; c++) {
       const isFree = r * gs + c === freeIdx;
       const cell = document.createElement('div');
+      const word = local.adeleCard[r]?.[c];
+      const isCalled = isFree || local.adeleMarked[r]?.[c] || (word && local.calledWords.includes(word));
       let cls = 'bingo-cell';
       if (local.adeleMarked[r]?.[c]) cls += ' marked-adele';
       else if (isFree)               cls += ' free';
+      else if (!isCalled)            cls += ' not-called';
       if (readonly)                  cls += ' readonly';
       cell.className = cls;
       cell.textContent = isFree ? '⭐ FREE' : (local.adeleCard[r]?.[c] || '');
@@ -916,6 +984,10 @@ function renderPeekGrid() {
 
 function toggleAdeleCell(r, c) {
   if (local.winner) return;
+  const gs = local.gridSize || 5;
+  const isFree = r * gs + c === Math.floor(gs * gs / 2);
+  const word = local.adeleCard[r]?.[c];
+  if (!isFree && (!word || !local.calledWords.includes(word))) return;
   const nowMarked = !local.adeleMarked[r][c];
   local.adeleMarked[r][c] = nowMarked;
   renderAdeleCard();
@@ -925,8 +997,7 @@ function toggleAdeleCell(r, c) {
     const word = local.adeleCard[r]?.[c] || (r===2&&c===2 ? 'FREE' : '');
     if (word) sessionRef(local.sessionId).child('lastMarkedWord').set(word);
   }
-  if (checkBingo(local.adeleMarked, 'adele-grid'))
-    sessionRef(local.sessionId).child('winner').set('Adele');
+  handleBingoCheck('Adele', local.adeleMarked, 'adele-grid');
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -944,9 +1015,12 @@ function renderNanaCard() {
     for (let c = 0; c < gs; c++) {
       const isFree = r * gs + c === freeIdx;
       const cell = document.createElement('div');
+      const word = local.nanaCard[r]?.[c];
+      const isCalled = isFree || local.nanaMarked[r]?.[c] || (word && local.calledWords.includes(word));
       let cls = 'bingo-cell';
       if (local.nanaMarked[r]?.[c]) cls += ' marked-nana';
       else if (isFree)              cls += ' free';
+      else if (!isCalled)           cls += ' not-called';
       cell.className = cls;
       cell.textContent = isFree ? '⭐ FREE' : (local.nanaCard[r]?.[c] || '');
       const row = r, col = c;
@@ -958,11 +1032,37 @@ function renderNanaCard() {
 
 function toggleNanaCell(r, c) {
   if (local.winner) return;
+  const gs = local.gridSize || 5;
+  const isFree = r * gs + c === Math.floor(gs * gs / 2);
+  const word = local.nanaCard[r]?.[c];
+  if (!isFree && (!word || !local.calledWords.includes(word))) return;
   local.nanaMarked[r][c] = !local.nanaMarked[r][c];
   renderNanaCard();
   sessionRef(local.sessionId).child('nanaMarked').set(local.nanaMarked);
-  if (checkBingo(local.nanaMarked, 'nana-grid'))
-    sessionRef(local.sessionId).child('winner').set('Nana');
+  handleBingoCheck('Nana', local.nanaMarked, 'nana-grid');
+}
+
+// Regular mode: any bingo line wins immediately.
+// Blackout mode: a bingo line just announces (once); only a fully-marked
+// card sets the winner and ends the game.
+function handleBingoCheck(name, marked, gridId) {
+  const gotBingo = checkBingo(marked, gridId);
+  if (local.gameMode === 'blackout') {
+    const flagField = name === 'Adele' ? 'adeleBingo' : 'nanaBingo';
+    const alreadyAnnounced = name === 'Adele' ? local.adeleBingo : local.nanaBingo;
+    if (gotBingo && !alreadyAnnounced) {
+      if (name === 'Adele') local.adeleBingo = true; else local.nanaBingo = true;
+      sessionRef(local.sessionId).update({ [flagField]: true, lastBingoBy: name });
+    }
+    if (checkBlackout(marked))
+      sessionRef(local.sessionId).child('winner').set(name);
+  } else {
+    if (gotBingo) sessionRef(local.sessionId).child('winner').set(name);
+  }
+}
+
+function checkBlackout(marked) {
+  return marked.every(row => row && row.every(v => v));
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1003,7 +1103,10 @@ function winLine(gridId, row, col, diag, gs) {
 function showWin(name) {
   local.winner = name;
   launchConfetti();
-  document.getElementById('win-sub').textContent = `${name} wins this round! 🎊`;
+  const msg = local.gameMode === 'blackout'
+    ? `${name} gets Blackout and wins! 🎊`
+    : `${name} wins this round! 🎊`;
+  document.getElementById('win-sub').textContent = msg;
   setTimeout(() => document.getElementById('win-overlay').classList.add('active'), 600);
 }
 
@@ -1112,6 +1215,8 @@ function renderCalledChips() {
 function nanaNewGame() {
   document.getElementById('win-overlay').classList.remove('active');
   local.winner = null;
+  local.adeleBingo = false;
+  local.nanaBingo = false;
 
   const { adeleCard, nanaCard, drawPool } = buildGameWords(local.listIdx, local.gridSize, local.extraWords);
 
@@ -1141,6 +1246,9 @@ function nanaNewGame() {
     lastCalledWord:  null,
     lastMarkedWord:  null,
     winner:          null,
+    adeleBingo:      false,
+    nanaBingo:       false,
+    lastBingoBy:     null,
   });
 }
 
