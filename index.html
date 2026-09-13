@@ -390,9 +390,17 @@ html, body {
     <div id="adele-bingo-toast" style="display:none;background:rgba(249,202,36,0.25);border:2px solid #f9ca24;border-radius:16px;padding:10px 20px;color:#fff;font-size:clamp(14px,2.5vw,20px);font-weight:bold;text-align:center;margin:8px auto;max-width:480px">
       🎉 <span id="adele-bingo-who"></span> got a Bingo!
     </div>
-    <div class="current-word-box" id="adele-current-word-box" style="display:none;margin:0 auto 8px">
-      <div class="current-word" id="adele-current-word">—</div>
-      <div class="word-count" id="adele-word-count">Nana will help you read it!</div>
+    <div id="adele-caller-area" style="display:none;width:100%;flex-direction:column;align-items:center;gap:8px;padding:8px 12px 0">
+      <div class="current-word-box" id="adele-current-word-box" style="margin:0 auto">
+        <div class="current-word" id="adele-current-word">—</div>
+        <div class="word-count" id="adele-word-count">Nana will help you read it!</div>
+      </div>
+      <div class="look-again-box" id="adele-look-again-box">
+        👀 Look again! Find "<span id="adele-look-again-word"></span>" on your card!
+      </div>
+      <div class="draw-btn-wrap">
+        <button class="btn-draw" id="adele-btn-draw" onclick="drawWord()">Draw a Word! 🎲</button>
+      </div>
     </div>
     <div class="card-area">
       <div class="bingo-header-row" id="adele-bingo-header"></div>
@@ -766,6 +774,8 @@ function startNanaGame() {
 
     document.querySelector('#screen-nana-game .player-tag').textContent =
       local.adeleCalls ? '🌻 Nana — Reading Helper' : '🌻 Nana — Caller';
+    document.querySelector('#screen-nana-game .draw-btn-wrap').style.display =
+      local.adeleCalls ? 'none' : '';
 
     renderNanaCard();
     renderCalledChips();
@@ -844,6 +854,7 @@ function startAdeleGame(initialData) {
     local.adeleCard      = d.adeleCard;
     local.adeleMarked    = d.adeleMarked;
     local.calledWords    = d.calledWords || [];
+    local.remainingWords = d.remainingWords || [];
     local.lastCalledWord = d.lastCalledWord || null;
     local.winner         = d.winner;
     local.listIdx        = d.listIdx    || 0;
@@ -854,8 +865,9 @@ function startAdeleGame(initialData) {
     local.adeleBingo     = d.adeleBingo || false;
     local.nanaBingo      = d.nanaBingo  || false;
 
-    document.getElementById('adele-current-word-box').style.display = local.adeleCalls ? '' : 'none';
+    document.getElementById('adele-caller-area').style.display = local.adeleCalls ? 'flex' : 'none';
     updateAdeleCurrentWordDisplay();
+    if (local.adeleCalls && local.lastCalledWord) checkLookAgain(local.lastCalledWord);
 
     renderAdeleCard();
     renderCalledChips();
@@ -865,13 +877,25 @@ function startAdeleGame(initialData) {
     attachListener(ref.child('calledWords'), 'value', s => {
       local.calledWords = s.val() || [];
       renderCalledChips();
+      renderAdeleCard();
+    });
+    attachListener(ref.child('remainingWords'), 'value', s => {
+      local.remainingWords = s.val() || [];
     });
     attachListener(ref.child('lastCalledWord'), 'value', s => {
       local.lastCalledWord = s.val();
       updateAdeleCurrentWordDisplay();
+      if (local.adeleCalls) {
+        if (local.lastCalledWord) checkLookAgain(local.lastCalledWord);
+        else hideLookAgain();
+      }
     });
     attachListener(ref.child('adeleMarked'), 'value', s => {
-      if (s.val()) local.adeleMarked = s.val();
+      if (s.val()) {
+        local.adeleMarked = s.val();
+        renderAdeleCard();
+        if (local.adeleCalls && local.lastCalledWord) checkLookAgain(local.lastCalledWord);
+      }
     });
     attachListener(ref.child('winner'), 'value', s => {
       if (s.val() && !document.getElementById('win-overlay').classList.contains('active'))
@@ -1139,7 +1163,7 @@ function showWin(name) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// DRAW WORD (Nana only)
+// DRAW WORD (Nana, or Adele in "Adele calls" mode)
 // ══════════════════════════════════════════════════════════════════
 function drawWord() {
   if (local.winner) return;
@@ -1150,7 +1174,10 @@ function drawWord() {
   }
 
   if (local.remainingWords.length === 0) {
-    document.getElementById('current-word').textContent = '🎉 All done!';
+    ['current-word','adele-current-word'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '🎉 All done!';
+    });
     return;
   }
 
@@ -1164,6 +1191,7 @@ function drawWord() {
   local.calledWords = called;
   local.lastCalledWord = word;
   updateCurrentWordDisplay();
+  updateAdeleCurrentWordDisplay();
   renderCalledChips();
 
   sessionRef(local.sessionId).update({
@@ -1225,14 +1253,33 @@ function checkLookAgain(word) {
 }
 
 function showLookAgain(word) {
-  document.getElementById('look-again-word').textContent = word;
-  const box = document.getElementById('look-again-box');
-  box.classList.remove('visible');
-  void box.offsetWidth;
-  box.classList.add('visible');
+  [['look-again-word','look-again-box'], ['adele-look-again-word','adele-look-again-box']].forEach(([wordId, boxId]) => {
+    const wordEl = document.getElementById(wordId);
+    const box = document.getElementById(boxId);
+    if (!wordEl || !box) return;
+    wordEl.textContent = word;
+    box.classList.remove('visible');
+    void box.offsetWidth;
+    box.classList.add('visible');
+  });
+  setDrawButtonsDisabled(true);
 }
 function hideLookAgain() {
-  document.getElementById('look-again-box').classList.remove('visible');
+  ['look-again-box','adele-look-again-box'].forEach(id => {
+    const box = document.getElementById(id);
+    if (box) box.classList.remove('visible');
+  });
+  setDrawButtonsDisabled(false);
+}
+function setDrawButtonsDisabled(disabled) {
+  ['btn-draw','adele-btn-draw'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = disabled;
+      btn.style.opacity = disabled ? '0.5' : '';
+      btn.style.cursor = disabled ? 'not-allowed' : '';
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════
