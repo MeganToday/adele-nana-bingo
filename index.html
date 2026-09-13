@@ -342,6 +342,12 @@ html, body {
       <button id="btn-mode-blackout" class="list-tab" onclick="setGameMode('blackout')">Blackout</button>
     </div>
 
+    <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Who calls the words?</div>
+    <div style="display:flex;gap:12px">
+      <button id="btn-caller-nana" class="list-tab active" onclick="setAdeleCalls(false)">🌻 Nana</button>
+      <button id="btn-caller-adele" class="list-tab" onclick="setAdeleCalls(true)">🌸 Adele</button>
+    </div>
+
     <button class="btn btn-primary" onclick="nanaCreateSession()">Create Game! 🎴</button>
     <button class="btn btn-secondary btn-small" onclick="showScreen('welcome')">← Back</button>
   </div>
@@ -383,6 +389,10 @@ html, body {
     </div>
     <div id="adele-bingo-toast" style="display:none;background:rgba(249,202,36,0.25);border:2px solid #f9ca24;border-radius:16px;padding:10px 20px;color:#fff;font-size:clamp(14px,2.5vw,20px);font-weight:bold;text-align:center;margin:8px auto;max-width:480px">
       🎉 <span id="adele-bingo-who"></span> got a Bingo!
+    </div>
+    <div class="current-word-box" id="adele-current-word-box" style="display:none;margin:0 auto 8px">
+      <div class="current-word" id="adele-current-word">—</div>
+      <div class="word-count" id="adele-word-count">Nana will help you read it!</div>
     </div>
     <div class="card-area">
       <div class="bingo-header-row" id="adele-bingo-header"></div>
@@ -541,6 +551,7 @@ let local = {
   gridSize: 5,        // 3 or 5
   extraWords: false,  // false = exact pool, true = 1.5x pool
   gameMode: 'regular', // 'regular' or 'blackout'
+  adeleCalls: false,  // true = Adele draws/calls the words (word also shown to Nana)
   // Local copies of Firebase data (updated by listeners)
   adeleCard: [],
   adeleMarked: [],
@@ -615,6 +626,8 @@ function renderSetup() {
   document.getElementById('btn-pool-extra').classList.toggle('active', local.extraWords);
   document.getElementById('btn-mode-regular').classList.toggle('active', local.gameMode === 'regular');
   document.getElementById('btn-mode-blackout').classList.toggle('active', local.gameMode === 'blackout');
+  document.getElementById('btn-caller-nana').classList.toggle('active', !local.adeleCalls);
+  document.getElementById('btn-caller-adele').classList.toggle('active', local.adeleCalls);
   const extraBtn = document.getElementById('btn-pool-extra');
   const lockExtra = local.gameMode === 'blackout';
   extraBtn.disabled = lockExtra;
@@ -638,6 +651,11 @@ function setPoolMode(extra) {
 function setGameMode(mode) {
   local.gameMode = mode;
   if (mode === 'blackout') local.extraWords = false; // force exact pool so every card word gets called
+  renderSetup();
+}
+
+function setAdeleCalls(adeleCalls) {
+  local.adeleCalls = adeleCalls;
   renderSetup();
 }
 
@@ -669,6 +687,7 @@ function nanaCreateSession() {
     gridSize:       local.gridSize,
     extraWords:     local.extraWords,
     gameMode:       local.gameMode,
+    adeleCalls:     local.adeleCalls,
     adeleCard:      adeleCard,
     adeleMarked:    makeMarkedGrid(local.gridSize),
     nanaCard:       nanaCard,
@@ -741,8 +760,12 @@ function startNanaGame() {
     local.gridSize       = d.gridSize   || 5;
     local.extraWords     = d.extraWords || false;
     local.gameMode       = d.gameMode   || 'regular';
+    local.adeleCalls     = d.adeleCalls || false;
     local.adeleBingo     = d.adeleBingo || false;
     local.nanaBingo      = d.nanaBingo  || false;
+
+    document.querySelector('#screen-nana-game .player-tag').textContent =
+      local.adeleCalls ? '🌻 Nana — Reading Helper' : '🌻 Nana — Caller';
 
     renderNanaCard();
     renderCalledChips();
@@ -827,8 +850,12 @@ function startAdeleGame(initialData) {
     local.gridSize       = d.gridSize   || 5;
     local.extraWords     = d.extraWords || false;
     local.gameMode       = d.gameMode   || 'regular';
+    local.adeleCalls     = d.adeleCalls || false;
     local.adeleBingo     = d.adeleBingo || false;
     local.nanaBingo      = d.nanaBingo  || false;
+
+    document.getElementById('adele-current-word-box').style.display = local.adeleCalls ? '' : 'none';
+    updateAdeleCurrentWordDisplay();
 
     renderAdeleCard();
     renderCalledChips();
@@ -841,6 +868,7 @@ function startAdeleGame(initialData) {
     });
     attachListener(ref.child('lastCalledWord'), 'value', s => {
       local.lastCalledWord = s.val();
+      updateAdeleCurrentWordDisplay();
     });
     attachListener(ref.child('adeleMarked'), 'value', s => {
       if (s.val()) local.adeleMarked = s.val();
@@ -1161,6 +1189,21 @@ function updateCurrentWordDisplay() {
   const countEl = document.getElementById('word-count');
   if (countEl) countEl.textContent =
     `${local.calledWords.length} word${local.calledWords.length===1?'':'s'} called`;
+}
+
+function updateAdeleCurrentWordDisplay() {
+  if (!local.adeleCalls) return;
+  const wordEl = document.getElementById('adele-current-word');
+  if (!wordEl) return;
+  const word = local.lastCalledWord;
+  if (word) {
+    wordEl.classList.remove('pop');
+    void wordEl.offsetWidth;
+    wordEl.classList.add('pop');
+    wordEl.textContent = word;
+  } else {
+    wordEl.textContent = '—';
+  }
 }
 
 // Returns true if blocked (Adele hasn't marked the word yet)
