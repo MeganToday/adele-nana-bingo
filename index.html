@@ -59,7 +59,6 @@ html, body {
 /* ── SETUP ── */
 #screen-setup { background:linear-gradient(135deg,#1a1a2e,#1a3a1a); }
 .setup-header { font-size:clamp(22px,5vw,40px); font-weight:bold; color:#fff; text-align:center; }
-.list-tabs { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
 .list-tab {
   padding:10px 20px; border-radius:30px;
   border:2px solid rgba(255,255,255,0.3);
@@ -189,8 +188,6 @@ html, body {
 .bingo-cell.free { background:rgba(255,255,255,0.22); border-color:rgba(255,255,255,0.45); cursor:default; }
 .bingo-cell.readonly { cursor:default; }
 .bingo-cell.readonly:active { transform:none; }
-.bingo-cell.not-called { cursor:default; opacity:0.5; }
-.bingo-cell.not-called:active { transform:none; }
 .bingo-cell.win-cell { animation:winPulse 0.7s ease infinite alternate; }
 @keyframes winPulse {
   from{box-shadow:0 0 8px #ffdd57;border-color:#ffdd57}
@@ -320,8 +317,7 @@ html, body {
   <!-- ══ SETUP (Nana only) ════════════════════════════════════════ -->
   <div id="screen-setup" class="screen screen-centered">
     <div class="setup-header">Nana's Setup 🌻</div>
-    <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Choose a word list:</div>
-    <div class="list-tabs" id="list-tabs"></div>
+    <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Word list:</div>
     <div class="list-preview" id="list-preview"></div>
 
     <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Board size:</div>
@@ -503,48 +499,21 @@ const db = firebase.database();
 // ═══════════════════════════════════════════════════════════════════
 const WORD_LISTS = [
   {
-    name: 'Kindergarten 1',
+    name: 'Sight Words',
     words: [
-      'a','and','away','big','blue','can','come','down','find','for',
-      'funny','go','help','here','I','in','is','it','jump','little',
-      'look','make','me','my','not','one','play','red','run','said',
-      'see','the','three','two','up','we','where','yellow','you','all',
-      'am','are','at','be','but','do','eat','four','get','good',
-      'have','he','into','like','new','no','now','on','our','out',
-      'please','ran','ride','saw','say','she','so','soon','that','they',
-      'this','too','want','was','went','what','who','will','with','yes',
-      'ball','bed','boy','car','cat','day','dog','fun','got','had',
-      'him','his','hot','how','let','man','may','mom','name','old',
-    ]
-  },
-  {
-    name: 'Kindergarten 2',
-    words: [
-      'after','again','an','any','ask','by','could','every','fly','from',
-      'give','going','has','her','just','know','live','of','once','open',
-      'over','put','round','some','stop','take','thank','them','then','think',
-      'walk','were','when','always','around','because','been','before','best','both',
-      'buy','call','cold','does','done','dont','fast','first','five','found',
-      'gave','goes','green','its','made','many','more','much','must','never',
-      'off','only','own','pull','read','right','sing','sit','sleep','tell',
-      'their','these','those','upon','use','very','wash','which','why','wish',
-      'work','would','write','black','brown','bring','clean','cut','drew','fall',
-      'full','hold','hurt','eight','far','draw','drink','keep','laugh','light',
-    ]
-  },
-  {
-    name: 'First Grade',
-    words: [
-      'about','better','carry','done','drink','eight','fall','far','full','got',
-      'grow','hold','hot','hurt','if','keep','kind','laugh','light','long',
-      'myself','never','only','own','pick','seven','shall','show','six','small',
-      'start','ten','together','try','warm','write','able','across','against','almost',
-      'also','another','became','become','begin','being','below','between','body','book',
-      'built','certain','change','children','close','country','different','each','earth','enough',
-      'example','eye','face','family','father','felt','few','food','form','girl',
-      'group','hand','hard','head','hear','high','home','idea','important','land',
-      'large','last','late','learn','leave','left','life','line','list','love',
-      'miss','mountain','next','night','often','page','place','point','river','said',
+      'a','after','again','always','and','another','any','are','be','because',
+      'been','both','by','cold','come','could','different','do','does',"don't",
+      'done','enough','every','far','find','first','for','four','from','full',
+      'give','go','good','great','has','have','he','her','here','his',
+      'hurt','into','is','knew','know','laugh','like','little','live','look',
+      'many','me','most','my','new','no','of','off','often','old',
+      'once','one','only','or','other','over','people','play','please','pretty',
+      'pull','put','said','say','school','see','she','should','so','some',
+      'something','sometimes','soon','start','talk','thank','the','their','there','these',
+      'they','think','those','thought','three','through','to','together','two','under',
+      'use','very','walk','want','was','water','way','we','were','what',
+      'where','who','whose','why','word','words','work','would','write','you',
+      'your','yours',
     ]
   },
 ];
@@ -616,15 +585,6 @@ function choosePlayer(player) {
 // SETUP (Nana)
 // ═══════════════════════════════════════════════════════════════════
 function renderSetup() {
-  const tabs = document.getElementById('list-tabs');
-  tabs.innerHTML = '';
-  WORD_LISTS.forEach((list, i) => {
-    const tab = document.createElement('button');
-    tab.className = 'list-tab' + (i === local.listIdx ? ' active' : '');
-    tab.textContent = list.name;
-    tab.onclick = () => { local.listIdx = i; renderSetup(); };
-    tabs.appendChild(tab);
-  });
   document.getElementById('list-preview').textContent =
     WORD_LISTS[local.listIdx].words.join(', ');
 
@@ -1010,12 +970,9 @@ function renderAdeleCard(gridId = 'adele-grid', readonly = false) {
     for (let c = 0; c < gs; c++) {
       const isFree = r * gs + c === freeIdx;
       const cell = document.createElement('div');
-      const word = local.adeleCard[r]?.[c];
-      const isCalled = isFree || local.adeleMarked[r]?.[c] || (word && local.calledWords.includes(word));
       let cls = 'bingo-cell';
       if (local.adeleMarked[r]?.[c]) cls += ' marked-adele';
       else if (isFree)               cls += ' free';
-      else if (!isCalled)            cls += ' not-called';
       if (readonly)                  cls += ' readonly';
       cell.className = cls;
       cell.textContent = isFree ? '⭐ FREE' : (local.adeleCard[r]?.[c] || '');
@@ -1067,12 +1024,9 @@ function renderNanaCard() {
     for (let c = 0; c < gs; c++) {
       const isFree = r * gs + c === freeIdx;
       const cell = document.createElement('div');
-      const word = local.nanaCard[r]?.[c];
-      const isCalled = isFree || local.nanaMarked[r]?.[c] || (word && local.calledWords.includes(word));
       let cls = 'bingo-cell';
       if (local.nanaMarked[r]?.[c]) cls += ' marked-nana';
       else if (isFree)              cls += ' free';
-      else if (!isCalled)           cls += ' not-called';
       cell.className = cls;
       cell.textContent = isFree ? '⭐ FREE' : (local.nanaCard[r]?.[c] || '');
       const row = r, col = c;
