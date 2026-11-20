@@ -292,6 +292,55 @@ html, body {
   position:fixed; top:0; left:0; width:100vw; height:100vh;
   pointer-events:none; z-index:200;
 }
+/* ── LAYOUT WRAPPERS (no effect in portrait) ── */
+#app { height:100dvh; }
+.bingo-header-row, .bingo-grid { max-width:min(96vw,calc(100dvh - 130px)); }
+.list-preview { flex-shrink:0; }
+.setup-options, .setup-group { display:flex; flex-direction:column; align-items:center; gap:18px; }
+.adele-body { flex:1; width:100%; min-height:0; display:flex; flex-direction:column; }
+.adele-caller-area { width:100%; flex-direction:column; align-items:center; gap:8px; padding:8px 12px 0; }
+.nana-left, .nana-right { display:contents; }
+#adele-bingo-toast {
+  position:fixed; top:72px; left:50%; transform:translateX(-50%);
+  z-index:60; width:max-content; max-width:90vw;
+}
+
+/* ── LANDSCAPE (iPad sideways): side-by-side, no scrolling ── */
+@media (orientation: landscape) {
+  .screen-centered { gap:12px; padding:16px 24px; }
+
+  /* Setup: options in a 2×2 grid */
+  .setup-options { display:grid; grid-template-columns:auto auto; gap:14px 48px; }
+  .setup-group { gap:8px; }
+
+  /* Adele (when she calls): word + draw on the left, card on the right */
+  .adele-body { flex-direction:row; }
+  .adele-caller-area {
+    width:40%; max-width:440px; flex-shrink:0;
+    justify-content:center; padding:12px 0 12px 20px;
+  }
+
+  /* Nana: word / draw / called words on the left, card on the right */
+  .nana-body {
+    flex-direction:row; align-items:stretch; justify-content:center;
+    gap:28px; overflow:hidden; padding:12px 20px;
+  }
+  .nana-left, .nana-right {
+    display:flex; flex-direction:column; align-items:center; gap:10px; min-height:0;
+  }
+  .nana-left { flex:1 1 0; max-width:460px; overflow-y:auto; justify-content:center; }
+  .nana-right { flex:0 0 auto; justify-content:center; }
+  .called-chips-row { max-height:none; flex:0 1 auto; min-height:34px; align-content:flex-start; }
+  .nana-card-wrap {
+    width:min(560px, calc(100vh - 160px));
+    width:min(560px, calc(100dvh - 160px));
+    max-width:none;
+  }
+  .nana-card-label { max-width:none; }
+  .current-word { font-size:clamp(36px,5.2vw,64px); letter-spacing:1px; }
+  .current-word-box { padding:14px 12px; }
+}
+
 ::-webkit-scrollbar { width:5px; height:5px; }
 ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.25); border-radius:3px; }
 </style>
@@ -320,28 +369,38 @@ html, body {
     <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Word list:</div>
     <div class="list-preview" id="list-preview"></div>
 
+    <div class="setup-options">
+    <div class="setup-group">
     <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Board size:</div>
     <div style="display:flex;gap:12px">
       <button id="btn-grid-3" class="list-tab" onclick="setGridSize(3)">3 × 3</button>
       <button id="btn-grid-5" class="list-tab active" onclick="setGridSize(5)">5 × 5</button>
     </div>
+    </div>
 
+    <div class="setup-group">
     <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Word pool:</div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
       <button id="btn-pool-exact" class="list-tab active" onclick="setPoolMode(false)" style="white-space:normal;text-align:center;line-height:1.3">Every word<br>is on the board</button>
       <button id="btn-pool-extra" class="list-tab" onclick="setPoolMode(true)" style="white-space:normal;text-align:center;line-height:1.3">Extra words<br>will be called</button>
     </div>
+    </div>
 
+    <div class="setup-group">
     <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Game mode:</div>
     <div style="display:flex;gap:12px">
       <button id="btn-mode-regular" class="list-tab active" onclick="setGameMode('regular')">Regular</button>
       <button id="btn-mode-blackout" class="list-tab" onclick="setGameMode('blackout')">Blackout</button>
     </div>
+    </div>
 
+    <div class="setup-group">
     <div style="color:rgba(255,255,255,0.7);font-size:clamp(14px,2.2vw,18px)">Who calls the words?</div>
     <div style="display:flex;gap:12px">
       <button id="btn-caller-nana" class="list-tab active" onclick="setAdeleCalls(false)">🌻 Nana</button>
       <button id="btn-caller-adele" class="list-tab" onclick="setAdeleCalls(true)">🌸 Adele</button>
+    </div>
+    </div>
     </div>
 
     <button class="btn btn-primary" onclick="nanaCreateSession()">Create Game! 🎴</button>
@@ -386,7 +445,8 @@ html, body {
     <div id="adele-bingo-toast" style="display:none;background:rgba(249,202,36,0.25);border:2px solid #f9ca24;border-radius:16px;padding:10px 20px;color:#fff;font-size:clamp(14px,2.5vw,20px);font-weight:bold;text-align:center;margin:8px auto;max-width:480px">
       🎉 <span id="adele-bingo-who"></span> got a Bingo!
     </div>
-    <div id="adele-caller-area" style="display:none;width:100%;flex-direction:column;align-items:center;gap:8px;padding:8px 12px 0">
+    <div class="adele-body">
+    <div id="adele-caller-area" class="adele-caller-area" style="display:none">
       <div class="current-word-box" id="adele-current-word-box" style="margin:0 auto">
         <div class="current-word" id="adele-current-word">—</div>
         <div class="word-count" id="adele-word-count">Nana will help you read it!</div>
@@ -402,6 +462,7 @@ html, body {
       <div class="bingo-header-row" id="adele-bingo-header"></div>
       <div class="bingo-grid" id="adele-grid"></div>
     </div>
+    </div>
   </div>
 
   <!-- ══ NANA GAME ═══════════════════════════════════════════════ -->
@@ -416,6 +477,7 @@ html, body {
       </div>
     </div>
     <div class="nana-body">
+      <div class="nana-left">
       <div class="current-word-box">
         <div class="current-word" id="current-word">—</div>
         <div class="word-count" id="word-count">0 words called</div>
@@ -434,10 +496,13 @@ html, body {
       </div>
       <div class="called-row-label">Called so far:</div>
       <div class="called-chips-row" id="nana-called-chips"></div>
+      </div>
+      <div class="nana-right">
       <div class="nana-card-label">Your card — tap to mark:</div>
       <div class="nana-card-wrap">
         <div class="nana-bingo-header" id="nana-bingo-header"></div>
         <div class="nana-grid" id="nana-grid"></div>
+      </div>
       </div>
     </div>
   </div>
